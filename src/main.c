@@ -42,11 +42,17 @@ int INITIAL_POSITION[20][20] = {
     {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
 };
 
+#define FOCUS_COLOR al_premul_rgba(255, 250, 250, 50)
+#define LOCK_COLOR al_premul_rgba(255, 250, 250, 90)
+//#define MOVE_COLOR al_premul_rgba(255, 255, 0, 100)
+
 // this is mainly for testing, not actually used. use emit_event(EVENT_TYPE) to emit user events.
 #define BASE_USER_EVENT_TYPE ALLEGRO_GET_EVENT_TYPE('c','c','c','c')
 #define EVENT_REDRAW (BASE_USER_EVENT_TYPE + 1)
 ALLEGRO_EVENT_SOURCE user_event_src;
 ALLEGRO_EVENT_QUEUE *event_queue = NULL;
+
+ALLEGRO_COLOR MOVE_COLOR[4] = {{0,0,0,0}, {0.4,0.4,0,0.3}, {0.3,0.3,0,0.3}, {0.3,0,0,0.3}};
 
 float RESIZE_DELAY = 0.04;
 float fixed_dt = 1.0/FPS;
@@ -69,6 +75,7 @@ typedef struct Board {
     int lock;
     int lock_i;
     int lock_j;
+    int lock_blk[3][3];
 // distance that can be moved in direction (i-1, j-1)
     int move[3][3];
     int move_mark[20][20];
@@ -149,9 +156,9 @@ void paint_tile(Board *b, int i, int j, ALLEGRO_COLOR color){
     }
 }
 
-#define FOCUS_COLOR al_premul_rgba(255, 250, 250, 50)
-#define LOCK_COLOR al_premul_rgba(255, 100, 0, 90)
-#define MOVE_COLOR al_premul_rgba(255, 255, 0, 100)
+ALLEGRO_COLOR color_trans(ALLEGRO_COLOR c, float f){
+    return (ALLEGRO_COLOR){c.r*f, c.g*f, c.b*f, c.a*f};
+}
 
 void draw_stuff(Game *g, Board *b){
     int i,j;
@@ -161,12 +168,20 @@ void draw_stuff(Game *g, Board *b){
     // focused block
     if( (b->fi>=0) && (b->fj>=0) )
     {
-        al_draw_filled_rectangle(b->x+(b->fj-1)*b->tsize, b->y+(b->fi-1)*b->tsize, b->x+(b->fj+2)*b->tsize, b->y+(b->fi+2)*b->tsize, FOCUS_COLOR);
+        if( !(b->lock && (b->move_mark[b->fi][b->fj] <2)) )
+           al_draw_filled_rectangle(b->x+(b->fj-1)*b->tsize, b->y+(b->fi-1)*b->tsize, b->x+(b->fj+2)*b->tsize, b->y+(b->fi+2)*b->tsize, FOCUS_COLOR);
     }
     
-    for(i=0; i<20; i++){
-        for(j=0; j<20; j++){
-            if(g->brd[i][j])
+    for(i=0; i<20; i++)
+    {
+        for(j=0; j<20; j++)
+        {
+            if(b->lock && b->move_mark[i][j]) // possible moves
+            {
+                    paint_tile(b, i, j, MOVE_COLOR[b->move_mark[i][j]]);
+            }
+
+            if(g->brd[i][j] && !(b->lock && (b->move_mark[b->fi][b->fj]==2) && (iabs(i-b->fi) <= 1) && (iabs(j-b->fj) <= 1))) // stones
             {
                 al_draw_filled_circle(b->x + b->tsize*j + (float)b->tsize/2, b->y + b->tsize*i + (float)b->tsize/2, b->pr, b->pcolor[g->brd[i][j]]);
                 al_draw_circle(b->x + b->tsize*j + (float)b->tsize/2, b->y + b->tsize*i + (float)b->tsize/2, b->pr, al_map_rgba(100, 100, 100, 100), 1);
@@ -174,23 +189,34 @@ void draw_stuff(Game *g, Board *b){
         }
     }
     
-    // locked block
-    if(b->lock)
-    {
-        al_draw_filled_rectangle(b->x+(b->lock_j-1)*b->tsize, b->y+(b->lock_i-1)*b->tsize, b->x+(b->lock_j+2)*b->tsize, b->y+(b->lock_i+2)*b->tsize, LOCK_COLOR);
-    }
-    
-    if(b->lock){ // possible moves
-        for(i=0; i< 20; i++){
-            for(j=0; j<20; j++){
-                if(b->move_mark[i][j]){
-                    paint_tile(b, i, j, MOVE_COLOR);
+    if(b->lock){
+        for(i=0; i<3; i++){
+            for(j=0; j<3; j++){
+                if(b->lock_blk[i][j]){
+                    if(b->move_mark[b->fi][b->fj]<= 1)
+                        al_draw_filled_circle(b->x + b->tsize*(b->lock_j+j-1) + (float)b->tsize/2, b->y + b->tsize*(b->lock_i+i-1) + (float)b->tsize/2, b->pr, b->pcolor[b->lock_blk[i][j]]);
+                    al_draw_circle(b->x + b->tsize*(b->lock_j+j-1) + (float)b->tsize/2, b->y + b->tsize*(b->lock_i+i-1) + (float)b->tsize/2, b->pr, al_map_rgba(100, 100, 100, 100), 1);
+                }
+            }
+        }
+
+        if(b->move_mark[b->fi][b->fj]>1){
+            for(i=0; i<3; i++){
+                for(j=0; j<3; j++){
+                    if(b->lock_blk[i][j]){
+                        if((b->fj+j-1 > 0) && (b->fj+j-1 < 19) && (b->fi+i-1 > 0) && (b->fi+i-1<19)){
+                            al_draw_filled_circle(b->x + b->tsize*(b->fj+j-1) + (float)b->tsize/2, b->y + b->tsize*(b->fi+i-1) + (float)b->tsize/2, b->pr, b->pcolor[b->lock_blk[i][j]]);
+                            al_draw_circle(b->x + b->tsize*(b->fj+j-1) + (float)b->tsize/2, b->y + b->tsize*(b->fi+i-1) + (float)b->tsize/2, b->pr, al_map_rgba(100, 100, 100, 100), 1);
+                        }
+                    }
                 }
             }
         }
     }
     
-
+    // xxx todo: draw rectangle at last move source & dest
+    // create draw functions for stones and board rectangles
+    
 }
 
 void get_tile(Board *b, int *tx, int *ty, int x, int y){
@@ -212,6 +238,7 @@ void get_possible_moves(Game *g, Board *b){
     
     for(di=-1; di<2; di++){
         for(dj=-1; dj<2; dj++){
+            set_brd(b->move_mark, i+di, j+dj, 1);
             k=0;
             if((di || dj) && brd(g, i+di, j+dj)){
                 do{
@@ -227,6 +254,7 @@ void get_possible_moves(Game *g, Board *b){
                         set_brd(b->move_mark, i+di+k*di, j+k*dj, 1);
                         set_brd(b->move_mark, i+di+k*di, j-1+k*dj, 1);
                     }
+             
                     if(dj){
                         if( brd(g, i + 1 + k*di, j + dj + k*dj) || brd(g, i - 1 + k*di, j + dj + k*dj) || brd(g, i + k*di, j + dj + k*dj) )
                             break;
@@ -236,11 +264,22 @@ void get_possible_moves(Game *g, Board *b){
                         if( brd(g, i + di + k*di, j + 1 + k*dj) || brd(g, i + di + k*di, j + k*dj) || brd(g, i + di + k*di, j -1 + k*dj) )
                             break;
                     }
+                    
                 }while(in_board(i+k*di, j+k*dj) && (g->brd[i][j] || (k<3)) );
             }
             b->move[di+1][dj+1] = k;
         }
     }
+    
+    for(di=-1; di<2; di++){
+        for(dj=-1; dj<2; dj++){
+            for(k=0; k <= b->move[di+1][dj+1]; k++){
+                set_brd(b->move_mark, i+k*di, j+k*dj, 2);
+            }
+        }
+    }
+    
+    set_brd(b->move_mark, i, j, 3);
 }
 
 void try_lock(Game *g, Board *b, int i, int j){
@@ -268,69 +307,43 @@ void try_lock(Game *g, Board *b, int i, int j){
     b->lock_j = j;
     b->lock = 1;
     get_possible_moves(g,b);
+    
+    // copy locked block and clean
+    for(ii=0; ii<3; ii++){
+        for(jj=0; jj<3; jj++){
+            b->lock_blk[ii][jj] = brd(g, b->lock_i+ii-1, b->lock_j+jj-1);
+            set_brd(g->brd, b->lock_i+ii-1, b->lock_j+jj-1, 0);
+        }
+    }
     return;
 }
 
 
 void try_move(Game *g, Board *b, int i, int j){
-    int k, ii, jj;
-    int di = i - b->lock_i;
-    int dj = j - b->lock_j;
-    int d;
+    int ii, jj;
+    
+    
+    if(b->move_mark[i][j] != 2){
+        i=b->lock_i, j=b->lock_j;
+    }
 
-    // if null move, unlock block
-    if( !di && !dj )
-    {
-        b->lock = 0;
-        return;
-    }
-    
-    // take only diagonal/vertical/horizontal moves
-    if( (di != 0) && (dj != 0) && (dj != di) && (dj != -di) )
-        return;
-    
-    i = b->lock_i;
-    j = b->lock_j;
-    d = max(iabs(di), iabs(dj));
-    di /= d;
-    dj /= d;
-    
-    // check allowed direction
-    if(!brd(g, i+di, j+dj)) return;
-    
-    // check allowed distance
-    if(!g->brd[b->lock_i][b->lock_j] && d>3) return;
-    
-    // check block path for intersection with other pieces
-    for(k = 1; k < d; k++){
-        if(dj){
-            if( brd(g, i + 1 + k*di, j + dj + k*dj) || brd(g, i - 1 + k*di, j + dj + k*dj) || brd(g, i + k*di, j + dj + k*dj) )
-                return;
-        }
-
-        if(di){
-            if( brd(g, i + di + k*di, j + 1 + k*dj) || brd(g, i + di + k*di, j + k*dj) || brd(g, i + di + k*di, j -1 + k*dj) )
-                return;
-        }
-    }
-    
-    // copy block
-    int blk[3][3];
-    for(ii=0; ii<3; ii++){
-        for(jj=0; jj<3; jj++){
-            blk[ii][jj] = brd(g, i+ii-1, j+jj-1);
-            set_brd(g->brd, i+ii-1, j+jj-1, 0);
-        }
-    }
     // make move
     for(ii = -1 ; ii < 2 ; ii++){
         for(jj = -1; jj < 2 ; jj++){
-            set_brd(g->brd, i + ii + d*di, j + jj + d*dj, blk[ii+1][jj+1]);
+            if((i+ii < 19) && (i+ii > 0) && (j+jj < 19) && (j+jj > 0))
+                set_brd(g->brd, i + ii, j + jj, b->lock_blk[ii+1][jj+1]);
         }
     }
-    
-    if(g->turn == 2) g->turn = 1;
-    else g->turn = 2;
+
+    // if null move, unlock block
+    if( (i != b->lock_i) || (j != b->lock_j) )
+    {
+        // move was made, switch turns
+        if(g->turn == 2) g->turn = 1;
+        else g->turn = 2;
+
+    } // otherwise move has no effect
+
     b->lock = 0;
 }
 
