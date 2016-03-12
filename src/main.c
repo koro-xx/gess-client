@@ -83,6 +83,12 @@ typedef struct Block {
     int b[3][3];
 } Block;
 
+typedef struct State{
+    int s[20][20];
+    struct State *parent;
+    struct State *child;
+} State;
+
 typedef struct Board {
     int tsize;
     int size;
@@ -104,13 +110,14 @@ typedef struct Board {
     int pov; // player on the bottom?
     int player; // on irc who is the player
     char nick[10]; // irc nickname
+    ALLEGRO_BITMAP *board_bmp;
 } Board;
 
 typedef struct Game {
-    int brd[20][20];
+    State *brd;
     int turn;
+    int moves;
 } Game;
-
 
 #define in_board(i,j) (((i>=0) && (i<20) && (j>=0) && (j<20)) ? 1 : 0)
 #define set_brd(t, i, j, k) do{ if(in_board(i,j)) t[i][j] = k; }while(0)
@@ -119,11 +126,11 @@ ALLEGRO_COLOR color_trans(ALLEGRO_COLOR c, float f){
     return (ALLEGRO_COLOR){c.r*f, c.g*f, c.b*f, c.a*f};
 }
 
-int brd(Game *g, int i, int j){
+int brd(State *p, int i, int j){
     if ( ((i<0) || (i>=20) || (j<0) || (j>=20)) )
         return 0;
     else
-        return g->brd[i][j];
+        return p->s[i][j];
 }
 
 
@@ -144,26 +151,20 @@ void emit_event(int event_type){
     al_emit_user_event(&user_event_src, &user_event, NULL);
 }
 
-void create_board(Game *g, Board *b){
-    int size = min(al_get_bitmap_width(al_get_target_bitmap()), al_get_bitmap_height(al_get_target_bitmap()));
-    b->tsize = size/20;
-    b->size = b->tsize*20;
-    b->x=0;
-    b->y=0;
-    b->pr = b->tsize * 0.45;
-    b->pcolor[0] = NULL_COLOR;
-    b->pcolor[1] = al_map_rgb(220, 220, 220);
-    b->pcolor[2] = al_map_rgb(60, 60, 60);
-    b->bg_color = al_map_rgb(30, 150, 250);
-    b->fi = -1;
-    b->fj = -1;
-}
+
+
 
 void init_game(Game *g){
     int i,j;
+    
+    g->brd = malloc(sizeof(*g->brd));
+    g->brd->parent = NULL;
+    g->brd->child = NULL;
+    
     for(i=0 ; i<20 ; i++)
         for(j=0 ; j<20 ; j++)
-            g->brd[i][j] = INITIAL_POSITION[j][i]; // swap coordinates since they're in the incorrect order
+            g->brd->s[i][j] = INITIAL_POSITION[j][i]; // swap coordinates since they're in the incorrect order
+    g->moves = 0;
     return;
 }
 
@@ -184,7 +185,10 @@ void draw_stone(Board *b, int i, int j, int style, int player){
     al_draw_circle(b->x + b->tsize*i + (float)b->tsize/2, b->y + b->tsize*j + (float)b->tsize/2, b->pr, color_trans(b->pcolor[3-player], 0.5),1); // al_map_rgba(100, 100, 100, 100),1
 }
 
-void draw_board(Board *b){
+#define draw_line(x0, y0, x1, y1, color, width) al_draw_line(x0+0.5, y0+0.5, x1+0.5, y1+0.5, color, width)
+
+
+void draw_board(Board *b){ // todo: fix coordinates so that they're half-integers (at least for bitmap drawing)
     int i;
     int fsize=b->tsize/2;
     int bbx, bby, bbw, bbh;
@@ -201,10 +205,12 @@ void draw_board(Board *b){
     al_draw_filled_rectangle(b->x + b->size - b->tsize, b->y + b->tsize,  b->x + b->size, b->y + b->size - b->tsize, color);
     
     // board lines
-    for(i=0; i<=20; i++){
-        al_draw_line(b->x+i*b->tsize, b->y, b->x+i*b->tsize, b->y+ b->size, DARK_GREY_COLOR, 1);
-        al_draw_line(b->x,b->y+i*b->tsize, b->x+b->size, b->y+i*b->tsize, DARK_GREY_COLOR, 1);
+    for(i=0; i<=19; i++){
+        draw_line(i*b->tsize, 0, i*b->tsize, b->size, DARK_GREY_COLOR, 1);
+        draw_line(0, i*b->tsize, b->size, i*b->tsize, DARK_GREY_COLOR, 1);
     }
+    draw_line(20*b->tsize-1, 0, i*b->tsize-1, b->size, DARK_GREY_COLOR, 1);
+    draw_line(0, 20*b->tsize-1, b->size, 20*b->tsize-1, DARK_GREY_COLOR, 1);
     
     // coordinates
     font = load_font_mem(text_font_mem, TEXT_FONT_FILE, -fsize);
@@ -218,6 +224,34 @@ void draw_board(Board *b){
 
     }
     al_hold_bitmap_drawing(false);
+}
+
+void init_board(Board *b){
+    b->pcolor[0] = NULL_COLOR;
+    b->pcolor[1] = al_map_rgb(220, 220, 220);
+    b->pcolor[2] = al_map_rgb(60, 60, 60);
+    b->bg_color = al_map_rgb(30, 150, 250);
+    b->fi = -1;
+    b->fj = -1;
+}
+
+void create_board(Board *b){
+    ALLEGRO_BITMAP *target = al_get_target_bitmap();
+    int size = min(al_get_bitmap_width(al_get_target_bitmap()), al_get_bitmap_height(al_get_target_bitmap()));
+    b->tsize = size/20;
+    b->size = b->tsize*20;
+    b->x=0;
+    b->y=0;
+    b->pr = b->tsize * 0.45;
+    b->board_bmp = al_create_bitmap(b->size,b->size);
+    al_set_target_bitmap(b->board_bmp);
+    al_clear_to_color(NULL_COLOR);
+    draw_board(b);
+    al_set_target_bitmap(target);
+}
+
+void destroy_board(Board *b){
+    ndestroy_bitmap(b->board_bmp);
 }
 
 void paint_tiles(Board *b, int i, int j, int w, int h, ALLEGRO_COLOR color){
@@ -253,8 +287,9 @@ void paint_tiles(Board *b, int i, int j, int w, int h, ALLEGRO_COLOR color){
 void draw_stuff(Game *g, Board *b){
     int i,j;
 
-    draw_board(b);
-    
+    al_clear_to_color(NULL_COLOR);
+    al_draw_bitmap(b->board_bmp, b->x, b->y, 0); //xxx todo: fix draw_board to not use b->x, b->y
+                   
     // focused block
     if( (b->fi>=0) && (b->fj>=0) )
     {
@@ -276,9 +311,9 @@ void draw_stuff(Game *g, Board *b){
                     paint_tiles(b, i, j, 1, 1, MOVE_COLOR[b->move_mark[i][j]]);
             }
 
-            if(g->brd[i][j] && !(b->lock && (b->move_mark[b->fi][b->fj]==2) && (iabs(i-b->fi) <= 1) && (iabs(j-b->fj) <= 1))) // stones
+            if(g->brd->s[i][j] && !(b->lock && (b->move_mark[b->fi][b->fj]==2) && (iabs(i-b->fi) <= 1) && (iabs(j-b->fj) <= 1))) // stones
             {
-                draw_stone(b, i, j, 0, g->brd[i][j]);
+                draw_stone(b, i, j, 0, g->brd->s[i][j]);
             }
         }
     }
@@ -307,6 +342,21 @@ void draw_stuff(Game *g, Board *b){
     // xxx todo: draw rectangle at last move source & dest
     // create draw functions for stones and board rectangles
     
+void destroy_game(Game *g){
+    while(g->brd){
+        g->brd = g->brd->parent;
+        free(g->brd->child);
+    }
+}
+
+void execute_undo(Game *g, Board *b){
+    if(!g->brd->parent) return;
+    g->brd = g->brd->parent;
+    free(g->brd->child);
+    b->lock = 0;
+    g->moves--;
+    g->turn = (g->turn == 1) ? 2 : 1;
+}
 
 
 void get_tile(Board *b, int *tx, int *ty, int x, int y){
@@ -335,7 +385,7 @@ void get_possible_moves(Game *g, Board *b){
         for(dj=-1; dj<2; dj++){
             set_brd(b->move_mark, i+di, j+dj, 1);
             k=0;
-            if((di || dj) && brd(g, i+di, j+dj)){
+            if((di || dj) && brd(g->brd, i+di, j+dj)){
                 do{
                     k++;
                     if(dj){
@@ -351,16 +401,16 @@ void get_possible_moves(Game *g, Board *b){
                     }
              
                     if(dj){
-                        if( brd(g, i + 1 + k*di, j + dj + k*dj) || brd(g, i - 1 + k*di, j + dj + k*dj) || brd(g, i + k*di, j + dj + k*dj) )
+                        if( brd(g->brd, i + 1 + k*di, j + dj + k*dj) || brd(g->brd, i - 1 + k*di, j + dj + k*dj) || brd(g->brd, i + k*di, j + dj + k*dj) )
                             break;
                     }
                 
                     if(di){
-                        if( brd(g, i + di + k*di, j + 1 + k*dj) || brd(g, i + di + k*di, j + k*dj) || brd(g, i + di + k*di, j -1 + k*dj) )
+                        if( brd(g->brd, i + di + k*di, j + 1 + k*dj) || brd(g->brd, i + di + k*di, j + k*dj) || brd(g->brd, i + di + k*di, j -1 + k*dj) )
                             break;
                     }
                     
-                }while(in_board(i+k*di, j+k*dj) && (g->brd[i][j] || (k<3)) );
+                }while(in_board(i+k*di, j+k*dj) && (g->brd->s[i][j] || (k<3)) );
             }
             b->move.b[di+1][dj+1] = k;
         }
@@ -385,8 +435,8 @@ int is_block_movable(Game *g, int i, int j){
     
     for(ii = max(i-1, 0) ; ii < min(i+2, 20) ; ii++){
         for(jj = max(j-1, 0) ; jj < min(j+2, 20) ; jj++){
-            if(g->brd[ii][jj]){
-                if(g->brd[ii][jj] != g->turn){
+            if(g->brd->s[ii][jj]){
+                if(g->brd->s[ii][jj] != g->turn){
                     lock = 0;
                     break;
                 } else if((ii != i) || (jj != j)){
@@ -405,8 +455,8 @@ void grab_block(Game *g, int i, int j, Block *blk){
     int ii, jj;
     for(ii=0; ii<3; ii++){
         for(jj=0; jj<3; jj++){
-            blk->b[ii][jj] = brd(g, i+ii-1, j+jj-1);
-            set_brd(g->brd, i+ii-1, j+jj-1, 0);
+            blk->b[ii][jj] = brd(g->brd, i+ii-1, j+jj-1);
+            set_brd(g->brd->s, i+ii-1, j+jj-1, 0);
         }
     }
 }
@@ -423,13 +473,13 @@ void try_lock(Game *g, Board *b, int i, int j){
     grab_block(g, i, j, &b->lock_blk);
 }
 
-void drop_block(Game *g, int i, int j, Block *blk){
+void drop_block(State *bs, int i, int j, Block *blk){
     int ii,jj;
     
     for(ii = -1 ; ii < 2 ; ii++){
         for(jj = -1; jj < 2 ; jj++){
             if((i+ii < 19) && (i+ii > 0) && (j+jj < 19) && (j+jj > 0))
-                set_brd(g->brd, i + ii, j + jj, blk->b[ii+1][jj+1]);
+                set_brd(bs->s, i + ii, j + jj, blk->b[ii+1][jj+1]);
         }
     }
 }
@@ -440,18 +490,22 @@ void try_move(Game *g, Board *b, int i, int j){
         i=b->lock_i, j=b->lock_j;
     }
 
-    // make move
-    drop_block(g, i, j, &b->lock_blk);
 
-    // if null move, unlock block
     if( (i != b->lock_i) || (j != b->lock_j) )
     {
         // move was made, switch turns
         if(g->turn == 2) g->turn = 1;
         else g->turn = 2;
-
-    } // otherwise move has no effect
-
+        g->moves++;
+        g->brd->child = malloc(sizeof(*g->brd));
+        memcpy(g->brd->child, g->brd, sizeof(*g->brd));
+        g->brd->child->parent = g->brd;
+        g->brd = g->brd->child;
+        g->brd->child = NULL;
+        drop_block(g->brd->parent, b->lock_i, b->lock_j, &b->lock_blk);
+    } // else no move was made
+    
+    drop_block(g->brd, i, j, &b->lock_blk);
     b->lock = 0;
 }
 
@@ -468,14 +522,14 @@ void focus_move(Board *b, int di, int dj){
     }
 }
 
-int is_ring(Game *g, int i, int j){
+int is_ring(State *bs, int i, int j){
     int di, dj, p;
     int p1=1, p2=1;
     
     for(di = -1; di < 2; di++){
         for(dj = -1; dj < 2; dj++){
             if((di == 0) && (dj == 0)) continue;
-            p = brd(g, i+di, j+dj);
+            p = brd(bs, i+di, j+dj);
             if(p==0) return 0;
             else if(p==2) p1 = 0;
             else if(p==1) p2 = 0;
@@ -485,13 +539,13 @@ int is_ring(Game *g, int i, int j){
     return p1 ? 1 : 2;
 }
 
-int check_win(Game *g){
+int check_win(State *bs){
     int i, j;
     int p1_lose = 1, p2_lose = 1;
     
     for(i=0; i<20; i++){
         for(j=0; j<20; j++){
-            switch(is_ring(g, i, j)){
+            switch(is_ring(bs, i, j)){
                 case 1:
                     p1_lose=0;
                     break;
@@ -506,6 +560,17 @@ int check_win(Game *g){
     return p1_lose + p2_lose;
 }
 
+void enter_move(Game *g, Board *b){
+    
+    if( (b->fi < 0) || (b->fj < 0) )
+        return;
+
+    if(b->lock){
+        try_move(g, b, b->fi, b->fj);
+    } else {
+        try_lock(g, b, b->fi, b->fj);
+    }
+}
 
 int main(int argc, char **argv){
     ALLEGRO_EVENT ev;
@@ -524,6 +589,8 @@ int main(int argc, char **argv){
     char move_str[64];
     ALLEGRO_THREAD *comm_thread;
     char opponent[64] = "koro";
+    int key_coords;
+    int type_coords = 0;
     
 //    irc_connect("gess-test");
 //    comm_thread = al_create_thread(irc_thread, (void *) opponent);
@@ -570,7 +637,8 @@ int main(int argc, char **argv){
     al_clear_to_color(BLACK_COLOR);
 
     init_game(&g);
-    create_board(&g, &b);
+    init_board(&b);
+    create_board(&b);
     b.pov = 2;
     b.player = 1;
     
@@ -619,7 +687,7 @@ RESTART:
     resize_update=0; resize_time = 0;
     mbdown_x = 0;
     mbdown_y = 0;
-    
+    type_coords = 0;
     
     al_set_target_backbuffer(display);
     al_clear_to_color(BLACK_COLOR);
@@ -658,26 +726,7 @@ RESTART:
                     ev.mouse.button = 1;
                 case ALLEGRO_EVENT_MOUSE_BUTTON_DOWN:
                 {
-                    int ci, cj;
-                    if( (b.fi < 0) || (b.fj < 0) )
-                        break;
-                    
-                    get_tile(&b, &ci, &cj, ev.mouse.x, ev.mouse.y);
-                    if(b.lock)
-                    {
-                        try_move(&g, &b, ci, cj);
-                        redraw=1;
-                        break;
-                    }
-                    
-                    if( (ci != b.fi) || (cj != b.fj) )
-                    {
-                        b.fi = ci;
-                        b.fj = cj;
-                        redraw = 1;
-                        break;
-                    }
-                    try_lock(&g, &b, ci, cj);
+                    enter_move(&g, &b);
                     redraw = 1;
                     break;
                 }
@@ -696,9 +745,14 @@ RESTART:
                         case ALLEGRO_KEY_ESCAPE:
                             noexit=0;
                             break;
-                        case ALLEGRO_KEY_R:
-                            restart=1;
-                            goto RESTART;
+//                        case ALLEGRO_KEY_R:
+//                            restart=1;
+//                            goto RESTART;
+//                            break;
+                            
+                        case ALLEGRO_KEY_BACKSPACE:
+                            execute_undo(&g, &b);
+                            redraw=1;
                             break;
                         case ALLEGRO_KEY_SPACE:
                             //params_gui(&g, &b, event_queue);
@@ -721,6 +775,23 @@ RESTART:
                             redraw=1;
                             break;
                         case ALLEGRO_KEY_ENTER:
+                            emit_event(ALLEGRO_EVENT_MOUSE_BUTTON_DOWN);
+                            break;
+                        default:
+                            if((ev.keyboard.unichar>= 'a') && (ev.keyboard.unichar <= 't')){
+                                if(type_coords == 0){
+                                    type_coords = 1;
+                                    b.fi = (b.pov == 1 ? ev.keyboard.unichar - 'a' : (19-(ev.keyboard.unichar - 'a')));
+                                    key_coords = b.fi;
+                                } else if (type_coords == 1){
+                                    type_coords = 0;
+                                    if(b.fi == key_coords){
+                                        b.fj = (b.pov == 1 ? (19-(ev.keyboard.unichar - 'a')) : ev.keyboard.unichar - 'a');
+                                        enter_move(&g, &b);
+                                    }
+                                }
+                                redraw=1;
+                            }
                             break;
                     }
                     break;
@@ -745,7 +816,7 @@ RESTART:
             resize_update=0;
             al_set_target_backbuffer(display);
 			al_acknowledge_resize(display);
-            create_board(&g, &b);
+            create_board(&b);
             al_resize_display(display, b.size + 1, b.size + 1);
             al_set_target_backbuffer(display);
 
