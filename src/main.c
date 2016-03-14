@@ -27,6 +27,7 @@ Todo:
 #include "macros.h"
 #include "allegro_stuff.h"
 #include "main.h"
+#include <libircclient.h>
 
 #define FPS 60.0
 
@@ -79,12 +80,22 @@ float fixed_dt = 1.0/FPS;
 int desktop_xsize, desktop_ysize;
 int fullscreen;
 
+enum {
+    GAME_PLAYING,
+    GAME_PLAYING_IRC,
+    GAME_WAITING_MOVE_ACK,
+    GAME_WAITING_OPPONENT_MOVE,
+    GAME_SEEKING,
+};
+
+
 typedef struct Block {
     int b[3][3];
 } Block;
 
 typedef struct State{
     int s[20][20];
+    char last_move[5];
     struct State *parent;
     struct State *child;
 } State;
@@ -109,14 +120,22 @@ typedef struct Board {
     int move_mark[20][20];
     int pov; // player on the bottom?
     int player; // on irc who is the player
-    char nick[10]; // irc nickname
     ALLEGRO_BITMAP *board_bmp;
+
+// irc stuff
+    char *opponent;
+    int game_state;
+    char *server;
+    char *channel;
+    int port;
+    char *nick;
 } Board;
 
 typedef struct Game {
     State *brd;
     int turn;
     int moves;
+    char (*history)[5];
 } Game;
 
 #define in_board(i,j) (((i>=0) && (i<20) && (j>=0) && (j<20)) ? 1 : 0)
@@ -131,6 +150,61 @@ int brd(State *p, int i, int j){
         return 0;
     else
         return p->s[i][j];
+}
+
+
+// convert letter coordinates to board coordinates and vice-versa
+
+char i_to_coord(int i){
+    return i + 'a';
+}
+
+char j_to_coord(int j){
+    return 'a'+(19-j);
+}
+
+int coord_to_i(char ci){
+    return ci-'a';
+}
+
+int coord_to_j(char cj){
+    return 19 - (cj-'a');
+}
+
+void get_move_coords(char *str, int i, int j, int ii, int jj){
+    str[0] = i_to_coord(i);
+    str[1] = j_to_coord(j);
+    str[2] = i_to_coord(ii);
+    str[3] = j_to_coord(jj);
+    str[4] = '\0';
+}
+
+// move elsewhere
+char *strdup (const char *s) {
+    char *d = malloc (strlen (s) + 1);   // Allocate memory
+    if (d != NULL) strcpy (d,s);         // Copy string if okay
+    return d;                            // Return new memory
+}
+
+
+
+void send_privmsg(char *nick, char *msg){
+    irc_cmd_msg(g_irc_s, nick, msg);
+    deblog("SENT: %s | %s", nick, msg);
+}
+
+void acknowledge_privmsg(char *nick, char *msg){
+    char str[128];
+    snprintf(str, 127, ":ACK %s", msg);
+    send_privmsg(nick, str);
+}
+
+void send_move(Game *g, Board *b){
+    char move[6];
+    move[0] = ',';
+    strcpy(move+1, g->brd->last_move);
+    send_privmsg(b->opponent, move);
+    b->game_state = GAME_WAITING_MOVE_ACK;
 }
 
 
@@ -151,20 +225,18 @@ void emit_event(int event_type){
     al_emit_user_event(&user_event_src, &user_event, NULL);
 }
 
-
-
-
 void init_game(Game *g){
     int i,j;
     
     g->brd = malloc(sizeof(*g->brd));
     g->brd->parent = NULL;
     g->brd->child = NULL;
-    
+
     for(i=0 ; i<20 ; i++)
         for(j=0 ; j<20 ; j++)
-            g->brd->s[i][j] = INITIAL_POSITION[j][i]; // swap coordinates since they're in the incorrect order
+            g->brd->s[i][j] = INITIAL_POSITION[j][i] ? ((INITIAL_POSITION[j][i] == 2) ? 1 : 2) : 0; // swap coordinates since they're in the incorrect order
     g->moves = 0;
+    g->history = NULL;
     return;
 }
 
@@ -190,6 +262,7 @@ void draw_stone(Board *b, int i, int j, int style, int player){
 
 void draw_board(Board *b){ // todo: fix coordinates so that they're half-integers (at least for bitmap drawing)
     int i;
+    char ch;
     int fsize=b->tsize/2;
     int bbx, bby, bbw, bbh;
     ALLEGRO_FONT *font;
@@ -216,23 +289,33 @@ void draw_board(Board *b){ // todo: fix coordinates so that they're half-integer
     font = load_font_mem(text_font_mem, TEXT_FONT_FILE, -fsize);
     al_hold_bitmap_drawing(true);
     for(i=1; i<19; i++){
-        al_get_glyph_dimensions(font, 'A'+i, &bbx, &bby, &bbw, &bbh);
-        al_draw_glyph(font, WHITE_COLOR, b->x + i*b->tsize + (b->tsize-bbw)/2, b->y + 19*b->tsize + (b->tsize-fsize)/2, 'a'+i);
-        al_draw_glyph(font, WHITE_COLOR,  b->x + (b->tsize-bbw)/2,  b->y + i*b->tsize + (b->tsize-fsize)/2, 'a'+19-i);
-        al_draw_glyph(font, WHITE_COLOR, b->x + i*b->tsize + (b->tsize-bbw)/2, b->y + (b->tsize-fsize)/2, 'a'+i);
-        al_draw_glyph(font, WHITE_COLOR,  b->x +  19*b->tsize + (b->tsize-bbw)/2,  b->y + i*b->tsize + (b->tsize-fsize)/2, 'a'+19-i);
+        if(b->pov == 1) ch = 'a'+i;
+        else ch = 'a'+19-i;
+        al_get_glyph_dimensions(font, ch, &bbx, &bby, &bbw, &bbh);
+        al_draw_glyph(font, WHITE_COLOR, b->x + i*b->tsize + (b->tsize-bbw)/2, b->y + 19*b->tsize + (b->tsize-fsize)/2, ch);
+        al_draw_glyph(font, WHITE_COLOR,  b->x + (b->tsize-bbw)/2,  b->y + (19-i)*b->tsize + (b->tsize-fsize)/2, ch);
+        al_draw_glyph(font, WHITE_COLOR, b->x + i*b->tsize + (b->tsize-bbw)/2, b->y + (b->tsize-fsize)/2, ch);
+        al_draw_glyph(font, WHITE_COLOR,  b->x +  19*b->tsize + (b->tsize-bbw)/2,  b->y + (19-i)*b->tsize + (b->tsize-fsize)/2, ch);
 
     }
     al_hold_bitmap_drawing(false);
 }
 
 void init_board(Board *b){
+    static char nick[10];
+    sprintf(nick, "gess%d", rand()%10000);
+   
     b->pcolor[0] = NULL_COLOR;
     b->pcolor[1] = al_map_rgb(220, 220, 220);
     b->pcolor[2] = al_map_rgb(60, 60, 60);
     b->bg_color = al_map_rgb(30, 150, 250);
     b->fi = -1;
     b->fj = -1;
+    
+    b->server = "irc.freenode.org";
+    b->nick = nick;
+    b->port = 6667;
+    b->channel = "#lalala";
 }
 
 void create_board(Board *b){
@@ -343,10 +426,11 @@ void draw_stuff(Game *g, Board *b){
     // create draw functions for stones and board rectangles
     
 void destroy_game(Game *g){
-    while(g->brd){
+    while(g->brd->parent){
         g->brd = g->brd->parent;
         free(g->brd->child);
     }
+    free(g->brd);
 }
 
 void execute_undo(Game *g, Board *b){
@@ -372,7 +456,6 @@ void get_tile(Board *b, int *tx, int *ty, int x, int y){
         }
     }
 }
-
 
 void get_possible_moves(Game *g, Board *b){
     int di, dj;
@@ -461,9 +544,9 @@ void grab_block(Game *g, int i, int j, Block *blk){
     }
 }
 
-void try_lock(Game *g, Board *b, int i, int j){
+int try_lock(Game *g, Board *b, int i, int j){
     
-    if(!is_block_movable(g, i, j)) return;
+    if(!is_block_movable(g, i, j)) return 0;
     
     b->lock_i = i;
     b->lock_j = j;
@@ -471,6 +554,7 @@ void try_lock(Game *g, Board *b, int i, int j){
     get_possible_moves(g,b);
     
     grab_block(g, i, j, &b->lock_blk);
+    return 1;
 }
 
 void drop_block(State *bs, int i, int j, Block *blk){
@@ -484,7 +568,9 @@ void drop_block(State *bs, int i, int j, Block *blk){
     }
 }
 
-void try_move(Game *g, Board *b, int i, int j){
+
+int try_move(Game *g, Board *b, int i, int j){
+    int ret = 0;
     
     if(b->move_mark[i][j] != 2){
         i=b->lock_i, j=b->lock_j;
@@ -502,11 +588,14 @@ void try_move(Game *g, Board *b, int i, int j){
         g->brd->child->parent = g->brd;
         g->brd = g->brd->child;
         g->brd->child = NULL;
+        get_move_coords(g->brd->last_move, b->lock_i, b->lock_j, i, j);
         drop_block(g->brd->parent, b->lock_i, b->lock_j, &b->lock_blk);
+        ret = 1;
     } // else no move was made
     
     drop_block(g->brd, i, j, &b->lock_blk);
     b->lock = 0;
+    return ret;
 }
 
 void focus_move(Board *b, int di, int dj){
@@ -565,11 +654,126 @@ void enter_move(Game *g, Board *b){
     if( (b->fi < 0) || (b->fj < 0) )
         return;
 
+    if(((b->game_state == GAME_PLAYING_IRC) && (g->turn != b->player)) || b->game_state == GAME_WAITING_MOVE_ACK)
+        return;
+    
     if(b->lock){
-        try_move(g, b, b->fi, b->fj);
+        if(try_move(g, b, b->fi, b->fj)) send_move(g, b);
     } else {
         try_lock(g, b, b->fi, b->fj);
     }
+}
+
+// moves should have the form "abcd" where ab = source oordinates and cd = destination
+int str_is_move(char *str){
+    int i;
+    
+    if(strlen(str) != 4) return 0;
+    for(i=0;i<4;i++)
+        if( (str[i]-'a' < 0) || (str[i] - 'a' > 19) )
+            return 0;
+    
+    return 1;
+}
+
+
+void process_irc_event(Game *g, Board *b, int type, ALLEGRO_USER_EVENT *ev)
+{
+    char *origin, *msg; // we should free these
+    
+    origin = (char*) ev->data1;
+    msg = (char *) ev->data2;
+
+    deblog("RECEIVED: %s | %s", origin, msg);
+    
+    if(type == EVENT_PRIVMSG_RECEIVED)
+    {
+        if(b->game_state == GAME_SEEKING)
+        {
+            if(!strcasecmp(msg, ":ACK seek"))
+            {
+                b->opponent = strdup(origin);
+                if(rand() % 2){ // decide who starts
+                    b->player = 2;
+                    b->pov = 2;
+                    send_privmsg(b->opponent, ":P2"); // tell: i am player 2
+                    b->game_state = GAME_PLAYING_IRC;
+                    emit_event(EVENT_RESTART);
+                } else {
+                    b->player = 1;
+                    b->pov = 1;
+                    send_privmsg(b->opponent, ":P1"); // tell: i am player 1
+                    b->game_state = GAME_PLAYING_IRC;
+                    emit_event(EVENT_RESTART);
+
+                }
+            } else if (!strcasecmp(msg, ":P1"))
+            {
+                b->opponent = strdup(origin);
+                b->game_state = GAME_PLAYING_IRC;
+                b->pov = 2;
+                b->player = 2;
+                emit_event(EVENT_RESTART);
+            }
+            else if(!strcasecmp(msg, ":P2"))
+            {
+                b->opponent = strdup(origin);
+                b->game_state = GAME_PLAYING_IRC;
+                b->pov = 1;
+                b->player = 1;
+                emit_event(EVENT_RESTART);
+            }
+        }
+        else if((b->game_state == GAME_PLAYING_IRC) && (g->turn != b->player)) // turn=2 instead?
+        {
+            if(!strcmp(origin, b->opponent))
+            {
+                if(msg[0] == ',') // means move coordinates follow
+                {
+                    if(!str_is_move(msg+1))
+                    {
+                        send_privmsg(b->opponent, "Invalid move. Send again.");
+                    }
+                    else
+                    {
+                    
+                        int i = coord_to_i(msg[1]);
+                        int j = coord_to_j(msg[2]);
+                        int ii = coord_to_i(msg[3]);
+                        int jj = coord_to_j(msg[4]);
+                        if(is_block_movable(g, i, j) && try_lock(g, b, i, j) && try_move(g, b,  ii, jj))
+                        {
+                            acknowledge_privmsg(b->opponent, msg);
+                        }
+                        else
+                        {
+                            send_privmsg(b->opponent, "Invalid move. Send again.");
+                        }
+                    }
+                } // else if (... other commands like undo, forefeit, adjourn, etc... )
+            }
+        }
+        else if(b->game_state == GAME_WAITING_MOVE_ACK)
+        {
+            if((strstr(msg, ":ACK ,") == msg) && (!strcmp(msg+6,g->brd->last_move)))
+            {
+                b->game_state = GAME_PLAYING_IRC;
+            }
+        }
+    }
+    else if(type == EVENT_CHANMSG_RECEIVED)
+    {
+        if(b->game_state == GAME_SEEKING)
+        {
+            if(!strcasecmp(msg, "seek"))
+            {
+                send_privmsg(origin, ":ACK seek");
+            }
+        }
+    }
+    
+    free(origin);
+    free(msg);
 }
 
 int main(int argc, char **argv){
@@ -587,15 +791,10 @@ int main(int argc, char **argv){
     Board b;
     Game g;
     char move_str[64];
-    ALLEGRO_THREAD *comm_thread;
     char opponent[64] = "koro";
     int key_coords;
     int type_coords = 0;
     
-//    irc_connect("gess-test");
-//    comm_thread = al_create_thread(irc_thread, (void *) opponent);
-//    al_start_thread(comm_thread);
-//    
     // seed random number generator. comment out for debug
     srand((unsigned int) time(NULL));
    
@@ -636,16 +835,18 @@ int main(int argc, char **argv){
     al_set_target_backbuffer(display);
     al_clear_to_color(BLACK_COLOR);
 
-    init_game(&g);
-    init_board(&b);
-    create_board(&b);
-    b.pov = 2;
-    b.player = 1;
     
     al_set_window_title(display, "Gess");
     al_init_user_event_source(&user_event_src);
-    
+
+    b.pov = 1;
+    b.player = 1;
+
+    init_board(&b);
+
 RESTART:
+    init_game(&g);
+    create_board(&b);
     
     if(!MOBILE && !fullscreen) {
         al_set_target_backbuffer(display);
@@ -710,6 +911,8 @@ RESTART:
                     deblog("RECEIVED HALT");
                     break;
                 case EVENT_RESTART:
+                    destroy_game(&g);
+                    destroy_board(&b);
                     restart=1;
                     goto RESTART;
                     
@@ -720,6 +923,10 @@ RESTART:
                 case ALLEGRO_EVENT_DISPLAY_CLOSE:
                     emit_event(EVENT_EXIT);
                     break;
+                    
+                case EVENT_IRC_JOIN:
+                    break;
+                    
                 case ALLEGRO_EVENT_TOUCH_BEGIN:
                     ev.mouse.x = ev.touch.x;
                     ev.mouse.y = ev.touch.y;
@@ -735,9 +942,14 @@ RESTART:
                     get_tile(&b, &b.fi, &b.fj, ev.mouse.x, ev.mouse.y);
                     redraw=1;
                     break;
+                case EVENT_PRIVMSG_RECEIVED:
+                case EVENT_CHANMSG_RECEIVED:
+                    process_irc_event(&g, &b, ev.type, &ev.user);
+                    redraw=1;
+                    break;
                     
-                case EVENT_OPPONENT_MOVE:
-                    printf("Moving %d,%d - %d,%d\n", (int)ev.user.data1, (int)ev.user.data2, (int)ev.user.data3, (int)ev.user.data4);
+                case EVENT_IRC_CONNECT:
+                    printf("MAIN THREAD: irc conencted.\n");
                     break;
                 case ALLEGRO_EVENT_KEY_CHAR:
                     keypress=1;
@@ -751,8 +963,10 @@ RESTART:
 //                            break;
                             
                         case ALLEGRO_KEY_BACKSPACE:
-                            execute_undo(&g, &b);
-                            redraw=1;
+                            if(b.game_state == GAME_PLAYING){ // not on irc
+                                execute_undo(&g, &b);
+                                redraw=1;
+                            } // otherwise we could request undo
                             break;
                         case ALLEGRO_KEY_SPACE:
                             //params_gui(&g, &b, event_queue);
@@ -777,6 +991,16 @@ RESTART:
                         case ALLEGRO_KEY_ENTER:
                             emit_event(ALLEGRO_EVENT_MOUSE_BUTTON_DOWN);
                             break;
+                            
+                        case ALLEGRO_KEY_1:
+                            IRC_connect(b.server, b.port, b.nick, b.channel);
+                            break;
+                        
+                        case ALLEGRO_KEY_2:
+                            irc_cmd_msg(g_irc_s, b.channel, "seek");
+                            b.game_state = GAME_SEEKING;
+                            break;
+                            
                         default:
                             if((ev.keyboard.unichar>= 'a') && (ev.keyboard.unichar <= 't')){
                                 if(type_coords == 0){
@@ -835,9 +1059,9 @@ RESTART:
             keypress=0;
         }
 
-        if( old_time - play_time > 1 ){ // runs every second
-            1; // do nothing
-        }
+//        if( old_time - play_time > 1 ){ // runs every second
+//            1; // do nothing
+//        }
         
         if(redraw) {
             redraw = 0;

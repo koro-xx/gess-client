@@ -1,7 +1,9 @@
 #ifndef gess_main_h
 #define gess_main_h
 
-#include<allegro5/allegro.h>
+
+#include <libircclient.h>
+#include <allegro5/allegro.h>
 
 #ifdef ALLEGRO_ANDROID
     #include <allegro5/allegro_android.h>
@@ -21,12 +23,16 @@
 
 #define BASE_USER_EVENT_TYPE ALLEGRO_GET_EVENT_TYPE('c','c','c','c')
 #define EVENT_REDRAW (BASE_USER_EVENT_TYPE + 1)
-#define EVENT_OPPONENT_MOVE (BASE_USER_EVENT_TYPE + 2)
+#define EVENT_MOVE_RECEIVED (BASE_USER_EVENT_TYPE + 2)
 #define EVENT_RESTART (BASE_USER_EVENT_TYPE + 3)
 #define EVENT_EXIT (BASE_USER_EVENT_TYPE + 4)
 #define EVENT_LOAD (BASE_USER_EVENT_TYPE + 5)
 #define EVENT_SAVE (BASE_USER_EVENT_TYPE + 6)
 #define EVENT_SETTINGS (BASE_USER_EVENT_TYPE + 7)
+#define EVENT_IRC_CONNECT (BASE_USER_EVENT_TYPE + 8)
+#define EVENT_IRC_JOIN (BASE_USER_EVENT_TYPE + 9)
+#define EVENT_PRIVMSG_RECEIVED (BASE_USER_EVENT_TYPE + 10)
+#define EVENT_CHANMSG_RECEIVED (BASE_USER_EVENT_TYPE + 11)
 
 
 #define BF_CODEPOINT_START 0x0860
@@ -38,7 +44,11 @@ extern char opponent_nick[32];
 void emit_event(int event_type);
 void emit_data_event(int event, intptr_t d1, intptr_t d2, intptr_t d3, intptr_t d4);
 
-void *irc_thread(ALLEGRO_THREAD *thr, void *arg);
-void irc_get_next(char *opponent);
-void irc_connect(char *nick);
+int IRC_connect(char *server, int port, char *nick, char *channel);
+char *strdup(const char *s);
+
+// global variables
+irc_session_t *g_irc_s;
+
+
 #endif

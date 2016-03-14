@@ -20,5 +20,18 @@
 #define nfree(x) do { free((x)); (x) = NULL; } while(0)
 #define ndestroy_bitmap(x) do { al_destroy_bitmap((x)); (x) = NULL; } while(0)
 
+
+// the sleep macro takes (float) seconds
+#ifdef _WIN32
+    #include <Windows.h>
+    #define snprintf _snprintf
+    #define vsnprintf _vsnprintf
+    #define strcasecmp _stricmp
+    #define strncasecmp _strnicmp
+    #define sleep(x) Sleep(x*1000) // neeeds <Windows.h>
+#else
+    #include <unistd.h>
+    #define sleep(x) usleep(x*1000000)
 #endif
 
+#endif
