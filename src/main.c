@@ -28,6 +28,7 @@ Todo:
 #include "allegro_stuff.h"
 #include "main.h"
 #include <libircclient.h>
+#include "widgetz.h"
 
 #define FPS 60.0
 
@@ -59,6 +60,8 @@ int INITIAL_POSITION[20][20] = {
 char player_nick[32];
 char opponent_nick[32];
 
+//temp
+WZ_WIDGET *i_gui;
 
 #define FOCUS_COLOR al_premul_rgba(255, 250, 250, 50)
 #define LOCK_COLOR al_premul_rgba(255, 250, 250, 90)
@@ -101,6 +104,10 @@ typedef struct Board_State{
 } Board_State;
 
 typedef struct Board {
+// screen
+    int xsize;
+    int ysize;
+// real board
     int tsize;
     int size;
     int pr;
@@ -119,7 +126,6 @@ typedef struct Board {
     Block move;
     int move_mark[20][20];
     int pov; // player on the bottom?
-    int player; // on irc who is the player
     ALLEGRO_BITMAP *board_bmp;
     int draw_last; // draw last move?
     
@@ -130,6 +136,12 @@ typedef struct Board {
     char *channel;
     int port;
     char *nick;
+    int game_type;
+    int player; // on irc who is the player
+    int connected;
+    
+// info_panel
+//    Info_Panel *info;
 } Board;
 
 typedef struct Game {
@@ -317,11 +329,45 @@ void init_board(Board *b){
     b->nick = nick;
     b->port = 6667;
     b->channel = "#lalala";
+    b->connected = 0;
+   // b->game_type = ?
+}
+
+
+void create_info_gui(Board *b){
+    //xxx assume that screen is wider than taller for now
+    int gui_w = b->xsize - b->x - b->size;
+    int gui_h = b->ysize;
+    int fsize = b->tsize/2;
+    WZ_WIDGET *gui;
+    static WZ_DEF_THEME theme;
+    /*
+     Define custom theme
+     wz_def_theme is a global vtable defined by the header
+     */
+    memset(&theme, 0, sizeof(theme));
+    memcpy(&theme, &wz_def_theme, sizeof(theme));
+    theme.font = load_font_mem(text_font_mem, TEXT_FONT_FILE, -fsize);
+    theme.color1 = al_map_rgba_f(0, 0.6, 0, 1);
+    theme.color2 = al_map_rgba_f(1, 1, 0, 1);
+    gui = wz_create_widget(0, b->x + b->size, 0, -1);
+    wz_set_theme(gui, (WZ_THEME*)&theme);
+    wz_create_fill_layout(gui, 0, 0, gui_w, gui_h/3, fsize, fsize, WZ_ALIGN_CENTRE, WZ_ALIGN_TOP, -1);
+    wz_create_textbox(gui, 0, 0, fsize, gui_w - 2*fsize, WZ_ALIGN_CENTRE, WZ_ALIGN_CENTRE, al_ustr_new("Player 2"),1, -1);
+    wz_create_fill_layout(gui, 0, gui_h/3, gui_w, gui_h/3, fsize, fsize, WZ_ALIGN_CENTRE, WZ_ALIGN_TOP, -1);
+    wz_create_textbox(gui, 0, 0, fsize, gui_w - 2*fsize, WZ_ALIGN_CENTRE, WZ_ALIGN_CENTRE, al_ustr_new("Status:"), 1, -1);
+    wz_create_fill_layout(gui, 0, 2*gui_h/3, gui_w, gui_h/3, fsize, fsize, WZ_ALIGN_CENTRE, WZ_ALIGN_TOP, -1);
+    wz_create_textbox(gui, 0, 0, fsize, gui_w - 2*fsize, WZ_ALIGN_CENTRE, WZ_ALIGN_CENTRE, al_ustr_new("Player 1"),1, -1);
+    
+    i_gui = gui;
 }
 
 void create_board(Board *b){
     ALLEGRO_BITMAP *target = al_get_target_bitmap();
-    int size = min(al_get_bitmap_width(al_get_target_bitmap()), al_get_bitmap_height(al_get_target_bitmap()));
+    int size;
+    b->xsize = al_get_bitmap_width(al_get_target_bitmap());
+    b->ysize = al_get_bitmap_height(al_get_target_bitmap());
+    size = min(b->xsize, b->ysize);
     b->tsize = size/20;
     b->size = b->tsize*20;
     b->x=0;
@@ -332,9 +378,13 @@ void create_board(Board *b){
     al_clear_to_color(NULL_COLOR);
     draw_board(b);
     al_set_target_bitmap(target);
+
+    create_info_gui(b);
 }
 
 void destroy_board(Board *b){
+    wz_destroy(i_gui);
+    i_gui = NULL;
     ndestroy_bitmap(b->board_bmp);
 }
 
@@ -489,6 +539,9 @@ draw_stone(b, b->fi+i-1, b->fj+j-1, 0, b->lock_blk.b[i][j]);
     
     //xxx todo: fix
     if((g->moves > 0) && b->draw_last) draw_last_move(g,b);
+    
+    // gui
+    wz_draw(i_gui);
     
 }
     
@@ -932,15 +985,15 @@ RESTART:
     init_game(&g);
     create_board(&b);
     
-    if(!MOBILE && !fullscreen) {
-        al_set_target_backbuffer(display);
-        al_resize_display(display, b.size, b.size);
-        al_set_window_position(display, (desktop_xsize-b.size)/2, (desktop_ysize-b.size)/2);
-        al_acknowledge_resize(display);
-        al_set_target_backbuffer(display);
-    }
-    
-	al_convert_bitmaps(); // turn bitmaps to memory bitmaps after resize (bug in allegro doesn't autoconvert)
+//    if(!MOBILE && !fullscreen) {
+//        al_set_target_backbuffer(display);
+//        al_resize_display(display, b.size, b.size);
+//        al_set_window_position(display, (desktop_xsize-b.size)/2, (desktop_ysize-b.size)/2);
+//        al_acknowledge_resize(display);
+//        al_set_target_backbuffer(display);
+//    }
+//    
+//	al_convert_bitmaps(); // turn bitmaps to memory bitmaps after resize (bug in allegro doesn't autoconvert)
 
     
     event_queue = al_create_event_queue();
@@ -983,14 +1036,23 @@ RESTART:
     
     g.turn = 1;
     b.lock = 0;
+
+    // temp
+    wz_register_sources(i_gui, event_queue);
+    
     while(noexit)
     {
         double dt = al_current_time() - old_time;
         al_rest(fixed_dt - dt); //rest at least fixed_dt
         dt = al_get_time() - old_time;
         old_time = al_get_time();
-       // al_wait_for_event(event_queue, &ev);
+
+        // temp
+        wz_update(i_gui, fixed_dt);
         while(al_get_next_event(event_queue, &ev)){ // empty out the event queue
+            // temp
+            wz_send_event(i_gui, &ev);
+
             switch(ev.type){
                 case ALLEGRO_EVENT_DISPLAY_HALT_DRAWING:
                     deblog("RECEIVED HALT");
@@ -1035,6 +1097,7 @@ RESTART:
                     
                 case EVENT_IRC_CONNECT:
                     printf("MAIN THREAD: irc conencted.\n");
+                    b.connected = 1;
                     break;
                 case ALLEGRO_EVENT_KEY_CHAR:
                     keypress=1;
@@ -1125,16 +1188,20 @@ RESTART:
             resize_update=0;
             al_set_target_backbuffer(display);
 			al_acknowledge_resize(display);
+            destroy_board(&b); // fix this
             create_board(&b);
-            al_resize_display(display, b.size + 1, b.size + 1);
+            wz_register_sources(i_gui, event_queue);
+
+//            al_resize_display(display, b.size + 1, b.size + 1);
             al_set_target_backbuffer(display);
 
 //            update_board(&g, &b);
 //			al_convert_bitmaps(); // turn bitmaps to video bitmaps
             redraw=1;
         // android workaround, try removing:
-            al_clear_to_color(BLACK_COLOR);
-            al_flip_display(); 
+//            al_clear_to_color(BLACK_COLOR);
+//            al_flip_display();
+            continue;
         }
         
         if(resizing) // skip redraw and other stuff
