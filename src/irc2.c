@@ -61,7 +61,7 @@ void addlog (const char * fmt, ...)
 #endif
     va_end (va_alist);
     
-    printf ("%s\n", buf);
+    deblog("%s", buf);
     
     if ( (fp = fopen ("irctest.log", "ab")) != 0 )
     {
@@ -118,70 +118,14 @@ void event_privmsg (irc_session_t * session, const char * event, const char * or
 }
 
 
-void dcc_recv_callback (irc_session_t * session, irc_dcc_t id, int status, void * ctx, const char * data, unsigned int length)
-{
-    //    static int count = 1;
-    //    char buf[12];
-    //
-    //    switch (status)
-    //    {
-    //        case LIBIRC_ERR_CLOSED:
-    //            printf ("DCC %d: chat closed\n", id);
-    //            break;
-    //
-    //        case 0:
-    //            if ( !data )
-    //            {
-    //                printf ("DCC %d: chat connected\n", id);
-    //                irc_dcc_msg	(session, id, "Hehe");
-    //            }
-    //            else
-    //            {
-    //                printf ("DCC %d: %s\n", id, data);
-    //                sprintf (buf, "DCC [%d]: %d", id, count++);
-    //                irc_dcc_msg	(session, id, buf);
-    //            }
-    //            break;
-    //
-    //        default:
-    //            printf ("DCC %d: error %s\n", id, irc_strerror(status));
-    //            break;
-    //    }
-}
-
-
-void dcc_file_recv_callback (irc_session_t * session, irc_dcc_t id, int status, void * ctx, const char * data, unsigned int length)
-{
-    //    if ( status == 0 && length == 0 )
-    //    {
-    //        printf ("File sent successfully\n");
-    //
-    //        if ( ctx )
-    //            fclose ((FILE*) ctx);
-    //    }
-    //    else if ( status )
-    //    {
-    //        printf ("File sent error: %d\n", status);
-    //
-    //        if ( ctx )
-    //            fclose ((FILE*) ctx);
-    //    }
-    //    else
-    //    {
-    //        if ( ctx )
-    //            fwrite (data, 1, length, (FILE*) ctx);
-    //        printf ("File sent progress: %d\n", length);
-    //    }
-}
-
-
 void event_channel (irc_session_t * session, const char * event, const char * origin, const char ** params, unsigned int count)
 {
-    //  char nickbuf[128];
     
     if ( count != 2 )
         return;
     
+    dump_event (session, event, origin, params, count);
+
     if(!origin) return;
     emit_data_event(EVENT_CHANMSG_RECEIVED, (intptr_t) strdup(origin), (intptr_t) strdup(params[1]), (intptr_t) strdup(params[0]), 0);
 }
@@ -189,21 +133,13 @@ void event_channel (irc_session_t * session, const char * event, const char * or
 
 void irc_event_dcc_chat (irc_session_t * session, const char * nick, const char * addr, irc_dcc_t dccid)
 {
-    printf ("DCC chat [%d] requested from '%s' (%s)\n", dccid, nick, addr);
-    
-    // irc_dcc_accept (session, dccid, 0, dcc_recv_callback);
+    deblog("DCC chat [%d] requested from '%s' (%s)\n", dccid, nick, addr);
 }
 
 
 void irc_event_dcc_send (irc_session_t * session, const char * nick, const char * addr, const char * filename, unsigned long size, irc_dcc_t dccid)
 {
-    //    FILE * fp;
-    printf ("DCC send [%d] requested from '%s' (%s): %s (%lu bytes)\n", dccid, nick, addr, filename, size);
-    
-    //    if ( (fp = fopen ("file", "wb")) == 0 )
-    //        abort();
-    //
-    //    irc_dcc_accept (session, dccid, fp, dcc_file_recv_callback);
+    deblog("DCC send [%d] requested from '%s' (%s): %s (%lu bytes)\n", dccid, nick, addr, filename, size);
 }
 
 void event_numeric (irc_session_t * session, unsigned int event, const char * origin, const char ** params, unsigned int count)
@@ -218,7 +154,7 @@ void event_numeric (irc_session_t * session, unsigned int event, const char * or
 void *create_irc_thread(ALLEGRO_THREAD *thr, void *arg){
     int i;
     // and run into forever loop, generating events
-    for(i=0; i<2;i++){
+    for(i=0; i<10;i++){
         printf("Attempt to connect %i/10...\n", i);
         if ( irc_run (g_irc_s) )
             sleep(1);
@@ -228,11 +164,33 @@ void *create_irc_thread(ALLEGRO_THREAD *thr, void *arg){
 }
 
 
+#ifdef _WIN32
+int winsock_init(void){
+    static int ws_init=0;
+    WSADATA wsaData;
+    if(ws_init<=0){
+        if ( WSAStartup ( MAKEWORD (2, 2), &wsaData) != 0 ){
+            errlog("Winsock API init error.");
+            ws_init = -1;
+            return 1;
+        }
+    } else {
+        ws_init = 1;
+    }
+    return 0;
+}
+#endif
+
 int IRC_connect(char *server, int port, char *nick, char *channel)
 {
     ALLEGRO_THREAD *irc_thread;
     irc_callbacks_t	callbacks;
+
+#ifdef _WIN32 // need to initialize exactly once per app.
+    if (winsock_init()) return 1;
+#endif
     
+        
     memset (&callbacks, 0, sizeof(callbacks));
     
     callbacks.event_connect = event_connect;

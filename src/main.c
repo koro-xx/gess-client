@@ -1,11 +1,11 @@
 /*
 Todo:
 
-- deal with POV (how to draw when pov = 2?
 - allow coordinates to be typed for move
 - gui for nick choosing / new game / save game
-- undo feature
- 
+- add request undo for irc
+- add store/adjourn/resume
+- ADD RING CHECK + RING INFO + RING HIGHLIGHT
  */
 
 
@@ -639,36 +639,6 @@ void drop_block(Board_State *bs, int i, int j, Block *blk){
 }
 
 
-int try_move(Game *g, Board *b, int i, int j){
-    int ret = 0;
-    
-    if(b->move_mark[i][j] < 2){
-        return 0;
-//        i=b->lock_i, j=b->lock_j;
-    }
-
-
-    if( (i != b->lock_i) || (j != b->lock_j) )
-    {
-        // move was made, switch turns
-        if(g->turn == 2) g->turn = 1;
-        else g->turn = 2;
-        g->moves++;
-        g->brd->child = malloc(sizeof(*g->brd));
-        memcpy(g->brd->child, g->brd, sizeof(*g->brd));
-        g->brd->child->parent = g->brd;
-        g->brd = g->brd->child;
-        g->brd->child = NULL;
-        get_move_coords(g->brd->last_move, b->lock_i, b->lock_j, i, j);
-        drop_block(g->brd->parent, b->lock_i, b->lock_j, &b->lock_blk);
-        b->draw_last = 1; //xxx todo: if set->draw_last
-        ret = 1;
-    } // else no move was made
-    
-    drop_block(g->brd, i, j, &b->lock_blk);
-    b->lock = 0;
-    return ret;
-}
 
 void focus_move(Board *b, int di, int dj){
 
@@ -687,6 +657,8 @@ int is_ring(Board_State *bs, int i, int j){
     int di, dj, p;
     int p1=1, p2=1;
     
+    if(bs->s[i][j]) return 0;
+    
     for(di = -1; di < 2; di++){
         for(dj = -1; dj < 2; dj++){
             if((di == 0) && (dj == 0)) continue;
@@ -700,7 +672,7 @@ int is_ring(Board_State *bs, int i, int j){
     return p1 ? 1 : 2;
 }
 
-int check_win(Board_State *bs){
+int has_ring(Board_State *bs){
     int i, j;
     int p1_lose = 1, p2_lose = 1;
     
@@ -714,11 +686,12 @@ int check_win(Board_State *bs){
                     p2_lose=0;
                     break;
             }
-            if( !p1_lose && !p2_lose ) return 0;
+            if( !p1_lose && !p2_lose )
+                return 1 + 2*1;
         }
     }
     
-    return p1_lose + p2_lose;
+    return !p1_lose | ((!p2_lose)<<1);
 }
 
 void enter_move(Game *g, Board *b){
@@ -751,6 +724,42 @@ int str_is_move(char *str){
     return 1;
 }
 
+
+int try_move(Game *g, Board *b, int i, int j){
+    int ret = 0;
+    
+    if(b->move_mark[i][j] < 2){
+        return 0;
+        //        i=b->lock_i, j=b->lock_j;
+    }
+    
+    
+    if( (i != b->lock_i) || (j != b->lock_j) )
+    {
+        g->brd->child = malloc(sizeof(*g->brd));
+        memcpy(g->brd->child, g->brd, sizeof(*g->brd));
+        g->brd->child->parent = g->brd;
+        drop_block(g->brd->child, i, j, &b->lock_blk);
+        if(!(has_ring(g->brd->child) & g->turn)){
+            nfree(g->brd->child);
+            return 0;
+        }
+        
+        // move was made, switch turns
+        g->brd = g->brd->child;
+        g->turn = (g->turn == 1) ? 2 : 1;
+        g->moves++;
+        g->brd->child = NULL;
+        get_move_coords(g->brd->last_move, b->lock_i, b->lock_j, i, j);
+        drop_block(g->brd->parent, b->lock_i, b->lock_j, &b->lock_blk);
+        b->draw_last = 1; //xxx todo: if set->draw_last
+        ret = 1;
+    } // else no move was made
+    
+    drop_block(g->brd, i, j, &b->lock_blk);
+    b->lock = 0;
+    return ret;
+}
 
 void process_irc_event(Game *g, Board *b, int type, ALLEGRO_USER_EVENT *ev)
 {
@@ -970,7 +979,8 @@ RESTART:
     al_flip_display();
     al_flush_event_queue(event_queue);
     play_time = old_time = al_get_time();
-
+    b.game_state = GAME_PLAYING;
+    
     g.turn = 1;
     b.lock = 0;
     while(noexit)
