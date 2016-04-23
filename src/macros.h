@@ -19,7 +19,7 @@
 #define iabs(x) ((x) > (-(x)) ? (x) : (-(x)))
 #define nfree(x) do { free((x)); (x) = NULL; } while(0)
 #define ndestroy_bitmap(x) do { al_destroy_bitmap((x)); (x) = NULL; } while(0)
-
+#define nmod(x, n) ((((x) % (n)) + (n)) % (n))
 
 // the sleep macro takes (float) seconds
 #ifdef _WIN32

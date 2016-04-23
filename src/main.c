@@ -29,6 +29,7 @@ Todo:
 #include "main.h"
 #include <libircclient.h>
 #include "widgetz.h"
+#include "terminal.h"
 
 #define FPS 60.0
 
@@ -62,6 +63,8 @@ char opponent_nick[32];
 
 //temp
 WZ_WIDGET *i_gui;
+Terminal *term;
+ALLEGRO_FONT *fixed_font;
 
 #define FOCUS_COLOR al_premul_rgba(255, 250, 250, 50)
 #define LOCK_COLOR al_premul_rgba(255, 250, 250, 90)
@@ -128,6 +131,7 @@ typedef struct Board {
     int pov; // player on the bottom?
     ALLEGRO_BITMAP *board_bmp;
     int draw_last; // draw last move?
+    int allow_move;
     
 // irc stuff
     char *opponent;
@@ -218,6 +222,7 @@ void send_move(Game *g, Board *b){
     strcpy(move+1, g->brd->last_move);
     send_privmsg(b->opponent, move);
     b->game_state = GAME_WAITING_MOVE_ACK;
+    b->allow_move = 1;
 }
 
 
@@ -330,6 +335,7 @@ void init_board(Board *b){
     b->port = 6667;
     b->channel = "#lalala";
     b->connected = 0;
+    b->allow_move = 1;
    // b->game_type = ?
 }
 
@@ -337,8 +343,8 @@ void init_board(Board *b){
 void create_info_gui(Board *b){
     //xxx assume that screen is wider than taller for now
     int gui_w = b->xsize - b->x - b->size;
-    int gui_h = b->ysize;
-    int fsize = b->tsize/2;
+    int gui_h = b->size;
+    int fsize = b->tsize*0.6;
     WZ_WIDGET *gui;
     static WZ_DEF_THEME theme;
     /*
@@ -348,18 +354,25 @@ void create_info_gui(Board *b){
     memset(&theme, 0, sizeof(theme));
     memcpy(&theme, &wz_def_theme, sizeof(theme));
     theme.font = load_font_mem(text_font_mem, TEXT_FONT_FILE, -fsize);
-    theme.color1 = al_map_rgba_f(0, 0.6, 0, 1);
-    theme.color2 = al_map_rgba_f(1, 1, 0, 1);
+    theme.color1 = al_map_rgba_f(.5, .5, .5, 1);
+    theme.color2 = al_map_rgba_f(1, 1, 1,1);
     gui = wz_create_widget(0, b->x + b->size, 0, -1);
     wz_set_theme(gui, (WZ_THEME*)&theme);
-    wz_create_fill_layout(gui, 0, 0, gui_w, gui_h/3, fsize, fsize, WZ_ALIGN_CENTRE, WZ_ALIGN_TOP, -1);
-    wz_create_textbox(gui, 0, 0, fsize, gui_w - 2*fsize, WZ_ALIGN_CENTRE, WZ_ALIGN_CENTRE, al_ustr_new("Player 2"),1, -1);
-    wz_create_fill_layout(gui, 0, gui_h/3, gui_w, gui_h/3, fsize, fsize, WZ_ALIGN_CENTRE, WZ_ALIGN_TOP, -1);
-    wz_create_textbox(gui, 0, 0, fsize, gui_w - 2*fsize, WZ_ALIGN_CENTRE, WZ_ALIGN_CENTRE, al_ustr_new("Status:"), 1, -1);
-    wz_create_fill_layout(gui, 0, 2*gui_h/3, gui_w, gui_h/3, fsize, fsize, WZ_ALIGN_CENTRE, WZ_ALIGN_TOP, -1);
-    wz_create_textbox(gui, 0, 0, fsize, gui_w - 2*fsize, WZ_ALIGN_CENTRE, WZ_ALIGN_CENTRE, al_ustr_new("Player 1"),1, -1);
+    wz_create_fill_layout(gui, 0, 0, gui_w, gui_h/3, fsize/2, fsize/3, WZ_ALIGN_CENTRE, WZ_ALIGN_TOP, -1);
+    wz_create_textbox(gui, 0, 0, gui_w-fsize, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, al_ustr_new("Player 2"),1, -1);
+    wz_create_fill_layout(gui, 0, gui_h/3, gui_w, gui_h/3, fsize/2, fsize/3, WZ_ALIGN_CENTRE, WZ_ALIGN_TOP, -1);
+    wz_create_textbox(gui, 0, 0, gui_w-fsize, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, al_ustr_newf("%s:%d", b->server, b->port), 1, -1);
+    wz_create_textbox(gui, 0, 0, gui_w-fsize, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, al_ustr_newf("Nickname: %s", b->nick), 1, -1);
+    wz_create_textbox(gui, 0, 0, gui_w-fsize, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, al_ustr_newf("%s", b->connected ? "Connected" : "Disconnected"), 1, -1);
+    wz_create_box(gui, 0, 0, gui_w-fsize, fsize, -1); //xxx must hide box
+    wz_create_button(gui, 0, 0, fsize*6, fsize*1.5, al_ustr_new("Settings"), 1, -1);
+    wz_create_fill_layout(gui, 0, 2*gui_h/3, gui_w, gui_h/3, fsize/2, fsize/3, WZ_ALIGN_CENTRE, WZ_ALIGN_TOP, -1);
+    wz_create_textbox(gui, 0, 0, gui_w-fsize, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, al_ustr_new("Player 1"),1, -1);
     
     i_gui = gui;
+    
+    term = term_create(80, 24);
+    fixed_font = al_load_font("fonts/DroidSansMono.ttf", 12, 0);
 }
 
 void create_board(Board *b){
@@ -412,7 +425,6 @@ void paint_tiles(Board *b, int i, int j, int w, int h, ALLEGRO_COLOR color){
         al_draw_filled_rectangle(b->x+i*b->tsize, b->y+j*b->tsize, b->x+(i+w)*b->tsize, b->y+(j+h)*b->tsize, color);
     }
 }
-
 
 
 void tile_rectangle(Board *b, int i, int j, int w, int h, ALLEGRO_COLOR color, int stroke){
@@ -542,7 +554,9 @@ draw_stone(b, b->fi+i-1, b->fj+j-1, 0, b->lock_blk.b[i][j]);
     
     // gui
     wz_draw(i_gui);
-    
+
+    al_draw_filled_rectangle(0,0, term->w*al_get_glyph_advance(fixed_font, '0', '0'), term->h*al_get_font_line_height(fixed_font), BLACK_COLOR);
+    term_draw(term, 0, 0, fixed_font, WHITE_COLOR);
 }
     
     // xxx todo: draw rectangle at last move source & dest
@@ -754,8 +768,10 @@ void enter_move(Game *g, Board *b){
     if( (b->fi < 0) || (b->fj < 0) )
         return;
 
-    if(((b->game_state == GAME_PLAYING_IRC) && (g->turn != b->player)) || b->game_state == GAME_WAITING_MOVE_ACK)
-        return;
+    if(!b->allow_move) return;
+    
+//    if(((b->game_state == GAME_PLAYING_IRC) && (g->turn != b->player)) || b->game_state == GAME_WAITING_MOVE_ACK)
+//        return;
     
     if(b->lock){
         if(try_move(g, b, b->fi, b->fj))
@@ -835,12 +851,14 @@ void process_irc_event(Game *g, Board *b, int type, ALLEGRO_USER_EVENT *ev)
                     b->pov = 2;
                     send_privmsg(b->opponent, ":P2"); // tell: i am player 2
                     b->game_state = GAME_PLAYING_IRC;
+                    b->allow_move = 0;
                     emit_event(EVENT_RESTART);
                 } else {
                     b->player = 1;
                     b->pov = 1;
                     send_privmsg(b->opponent, ":P1"); // tell: i am player 1
                     b->game_state = GAME_PLAYING_IRC;
+                    b->allow_move = 1;
                     emit_event(EVENT_RESTART);
 
                 }
@@ -850,6 +868,7 @@ void process_irc_event(Game *g, Board *b, int type, ALLEGRO_USER_EVENT *ev)
                 b->game_state = GAME_PLAYING_IRC;
                 b->pov = 2;
                 b->player = 2;
+                b->allow_move = 0;
                 emit_event(EVENT_RESTART);
             }
             else if(!strcasecmp(msg, ":P2"))
@@ -858,6 +877,7 @@ void process_irc_event(Game *g, Board *b, int type, ALLEGRO_USER_EVENT *ev)
                 b->game_state = GAME_PLAYING_IRC;
                 b->pov = 1;
                 b->player = 1;
+                b->allow_move = 1;
                 emit_event(EVENT_RESTART);
             }
         }
@@ -881,6 +901,7 @@ void process_irc_event(Game *g, Board *b, int type, ALLEGRO_USER_EVENT *ev)
                         if(is_block_movable(g, i, j) && try_lock(g, b, i, j) && try_move(g, b,  ii, jj))
                         {
                             acknowledge_privmsg(b->opponent, msg);
+                            b->allow_move = 1;
                         }
                         else
                         {
@@ -1040,6 +1061,8 @@ RESTART:
     // temp
     wz_register_sources(i_gui, event_queue);
     
+    int terminal_has_focus = 1;
+    
     while(noexit)
     {
         double dt = al_current_time() - old_time;
@@ -1101,70 +1124,87 @@ RESTART:
                     break;
                 case ALLEGRO_EVENT_KEY_CHAR:
                     keypress=1;
-                    switch(ev.keyboard.keycode){
-                        case ALLEGRO_KEY_ESCAPE:
-                            noexit=0;
-                            break;
-//                        case ALLEGRO_KEY_R:
-//                            restart=1;
-//                            goto RESTART;
-//                            break;
-                            
-                        case ALLEGRO_KEY_BACKSPACE:
-                            if(b.game_state == GAME_PLAYING){ // not on irc
-                                execute_undo(&g, &b);
+                    
+                    if(terminal_has_focus){
+                        if(ev.keyboard.keycode == ALLEGRO_KEY_BACKSPACE){
+                            term_backspace(term);
+                        } else if(ev.keyboard.keycode == ALLEGRO_KEY_ENTER){
+                            term_enter(term);
+                        } else {
+                            term_append_char(term, ev.keyboard.unichar);
+                        }
+                        redraw = 1;
+                    } else {
+                        switch(ev.keyboard.keycode){
+                            case ALLEGRO_KEY_ESCAPE:
+                                noexit=0;
+                                break;
+    //                        case ALLEGRO_KEY_R:
+    //                            restart=1;
+    //                            goto RESTART;
+    //                            break;
+                                
+                            case ALLEGRO_KEY_BACKSPACE:
+                                if(b.game_state == GAME_PLAYING){ // not on irc
+                                    execute_undo(&g, &b);
+                                    redraw=1;
+                                } // otherwise we could request undo
+                                break;
+                            case ALLEGRO_KEY_SPACE:
+                                //params_gui(&g, &b, event_queue);
+                                //win_gui(&g, &b, event_queue);
+                                break;
+                            case ALLEGRO_KEY_LEFT:
+                                focus_move(&b, -1, 0);
                                 redraw=1;
-                            } // otherwise we could request undo
-                            break;
-                        case ALLEGRO_KEY_SPACE:
-                            //params_gui(&g, &b, event_queue);
-                            //win_gui(&g, &b, event_queue);
-                            break;
-                        case ALLEGRO_KEY_LEFT:
-                            focus_move(&b, -1, 0);
-                            redraw=1;
-                            break;
-                        case ALLEGRO_KEY_RIGHT:
-                            focus_move(&b, 1, 0);
-                            redraw=1;
-                            break;
-                        case ALLEGRO_KEY_UP:
-                            focus_move(&b, 0, -1);
-                            redraw=1;
-                            break;
-                        case ALLEGRO_KEY_DOWN:
-                            focus_move(&b, 0, 1);
-                            redraw=1;
-                            break;
-                        case ALLEGRO_KEY_ENTER:
-                            emit_event(ALLEGRO_EVENT_MOUSE_BUTTON_DOWN);
-                            break;
+                                break;
+                            case ALLEGRO_KEY_RIGHT:
+                                focus_move(&b, 1, 0);
+                                redraw=1;
+                                break;
+                            case ALLEGRO_KEY_UP:
+                                focus_move(&b, 0, -1);
+                                redraw=1;
+                                break;
+                            case ALLEGRO_KEY_DOWN:
+                                focus_move(&b, 0, 1);
+                                redraw=1;
+                                break;
+                            case ALLEGRO_KEY_ENTER:
+                                emit_event(ALLEGRO_EVENT_MOUSE_BUTTON_DOWN);
+                                break;
+                                
+                            case ALLEGRO_KEY_1:
+                                IRC_connect(b.server, b.port, b.nick, b.channel);
+                                break;
                             
-                        case ALLEGRO_KEY_1:
-                            IRC_connect(b.server, b.port, b.nick, b.channel);
-                            break;
-                        
-                        case ALLEGRO_KEY_2:
-                            irc_cmd_msg(g_irc_s, b.channel, "seek");
-                            b.game_state = GAME_SEEKING;
-                            break;
-                            
-                        default:
-                            if((ev.keyboard.unichar>= 'a') && (ev.keyboard.unichar <= 't')){
-                                if(type_coords == 0){
-                                    type_coords = 1;
-                                    b.fi = (b.pov == 1 ? ev.keyboard.unichar - 'a' : (19-(ev.keyboard.unichar - 'a')));
-                                    key_coords = b.fi;
-                                } else if (type_coords == 1){
-                                    type_coords = 0;
-                                    if(b.fi == key_coords){
-                                        b.fj = (b.pov == 1 ? (19-(ev.keyboard.unichar - 'a')) : ev.keyboard.unichar - 'a');
-                                        enter_move(&g, &b);
+                            case ALLEGRO_KEY_2:
+                                irc_cmd_msg(g_irc_s, b.channel, "seek");
+                                b.game_state = GAME_SEEKING;
+                                break;
+                                
+                            case ALLEGRO_KEY_T:
+                                term_add_line(term, "This is a test line.");
+                                redraw=1;
+                                break;
+                                
+                            default:
+                                if((ev.keyboard.unichar>= 'a') && (ev.keyboard.unichar <= 't')){
+                                    if(type_coords == 0){
+                                        type_coords = 1;
+                                        b.fi = (b.pov == 1 ? ev.keyboard.unichar - 'a' : (19-(ev.keyboard.unichar - 'a')));
+                                        key_coords = b.fi;
+                                    } else if (type_coords == 1){
+                                        type_coords = 0;
+                                        if(b.fi == key_coords){
+                                            b.fj = (b.pov == 1 ? (19-(ev.keyboard.unichar - 'a')) : ev.keyboard.unichar - 'a');
+                                            enter_move(&g, &b);
+                                        }
                                     }
+                                    redraw=1;
                                 }
-                                redraw=1;
-                            }
-                            break;
+                                break;
+                        }
                     }
                     break;
                 case ALLEGRO_EVENT_DISPLAY_RESIZE:
