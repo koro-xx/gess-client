@@ -25,6 +25,8 @@ typedef struct Terminal{
     char buf[TERM_LINE_SIZE];
 /* cursor position */
     int cursor;
+///* scrollback position */
+//    int scrollback;
 } Terminal;
 
 

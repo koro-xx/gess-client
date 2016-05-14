@@ -9,7 +9,7 @@
 #include "main.h"
 
 MemFile text_font_mem={0};;
-const char *TEXT_FONT_FILE = "fonts/text_font.ttf";
+const char *TEXT_FONT_FILE = "fonts/DroidSansMono.ttf"; //`"fonts/text_font.ttf";
 
 struct Buffer_USTR{
     ALLEGRO_USTR *ustr;

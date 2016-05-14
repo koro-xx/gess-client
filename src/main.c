@@ -62,8 +62,6 @@ char player_nick[32];
 char opponent_nick[32];
 
 //temp
-WZ_WIDGET *i_gui;
-Terminal *term;
 ALLEGRO_FONT *fixed_font;
 
 #define FOCUS_COLOR al_premul_rgba(255, 250, 250, 50)
@@ -85,6 +83,11 @@ float fixed_dt = 1.0/FPS;
 
 int desktop_xsize, desktop_ysize;
 int fullscreen;
+
+enum {
+    BUTTON_SETTINGS,
+    BUTTON_CHAT
+};
 
 enum {
     GAME_PLAYING,
@@ -143,9 +146,16 @@ typedef struct Board {
     int game_type;
     int player; // on irc who is the player
     int connected;
+    Terminal *chat_term;
+    int term_show;
     
-// info_panel
-//    Info_Panel *info;
+// guis | todo: make one big gui (whole screen) and destroy/create other guis as widgets
+    WZ_WIDGET* i_gui;
+    WZ_WIDGET* settings_gui;
+    
+//  extra displayed guis
+    WZ_WIDGET* gui[5];
+    int gui_n;
 } Board;
 
 typedef struct Game {
@@ -344,7 +354,7 @@ void create_info_gui(Board *b){
     //xxx assume that screen is wider than taller for now
     int gui_w = b->xsize - b->x - b->size;
     int gui_h = b->size;
-    int fsize = b->tsize*0.6;
+    int fsize = b->tsize*0.5;
     WZ_WIDGET *gui;
     static WZ_DEF_THEME theme;
     /*
@@ -365,14 +375,59 @@ void create_info_gui(Board *b){
     wz_create_textbox(gui, 0, 0, gui_w-fsize, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, al_ustr_newf("Nickname: %s", b->nick), 1, -1);
     wz_create_textbox(gui, 0, 0, gui_w-fsize, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, al_ustr_newf("%s", b->connected ? "Connected" : "Disconnected"), 1, -1);
     wz_create_box(gui, 0, 0, gui_w-fsize, fsize, -1); //xxx must hide box
-    wz_create_button(gui, 0, 0, fsize*6, fsize*1.5, al_ustr_new("Settings"), 1, -1);
+    wz_create_button(gui, 0, 0, fsize*5, fsize*1.5, al_ustr_new("Settings"), 1, BUTTON_SETTINGS);
+    wz_create_button(gui, 0, 0, fsize*5, fsize*1.5, al_ustr_new("Chat"), 1, BUTTON_CHAT);
     wz_create_fill_layout(gui, 0, 2*gui_h/3, gui_w, gui_h/3, fsize/2, fsize/3, WZ_ALIGN_CENTRE, WZ_ALIGN_TOP, -1);
     wz_create_textbox(gui, 0, 0, gui_w-fsize, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, al_ustr_new("Player 1"),1, -1);
     
-    i_gui = gui;
+    b->i_gui = gui;
     
-    term = term_create(80, 24);
     fixed_font = al_load_font("fonts/DroidSansMono.ttf", 12, 0);
+}
+
+WZ_WIDGET* create_settings_gui(Board *b){
+    //xxx assume that screen is wider than taller for now
+    int gui_w = b->xsize*0.7;
+    int gui_h = b->ysize*0.8;
+    int fsize = b->tsize*0.6;
+    WZ_WIDGET *gui;
+    static WZ_DEF_THEME theme;
+    /*
+     Define custom theme
+     wz_def_theme is a global vtable defined by the header
+     */
+    memset(&theme, 0, sizeof(theme));
+    memcpy(&theme, &wz_def_theme, sizeof(theme));
+    theme.font = load_font_mem(text_font_mem, TEXT_FONT_FILE, -fsize);
+    theme.color1 = al_map_rgba_f(.5, .5, .5, 1);
+    theme.color2 = al_map_rgba_f(1, 1, 1,1);
+    gui = wz_create_widget(0, (b->xsize-gui_w)/2, (b->ysize-gui_h)/2, -1);
+    wz_set_theme(gui, (WZ_THEME*)&theme);
+    wz_create_fill_layout(gui, 0, 0, gui_w, fsize*4, fsize, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_TOP, -1);
+    wz_create_textbox(gui, 0, 0, fsize*10, fsize*2, WZ_ALIGN_RIGHT, WZ_ALIGN_CENTRE, al_ustr_new("IRC Nickname:"),1, -1);
+    wz_create_editbox(gui, 0, 0, gui_w/2.5, fsize*2, al_ustr_new(b->nick), 1, -1);
+    wz_create_fill_layout(gui, 0, fsize*4, gui_w, fsize*4, fsize, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_TOP, -1);
+    wz_create_textbox(gui, 0, 0, fsize*10, fsize*2, WZ_ALIGN_RIGHT, WZ_ALIGN_CENTRE, al_ustr_new("IRC Server:"),1, -1);
+    wz_create_editbox(gui, 0, 0, gui_w/2.5, fsize*2, al_ustr_new(b->server), 1, -1);
+    
+    wz_create_fill_layout(gui, 0, fsize*8, gui_w, fsize*4, fsize, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_TOP, -1);
+    wz_create_textbox(gui, 0, 0, fsize*10, fsize*2, WZ_ALIGN_RIGHT, WZ_ALIGN_CENTRE, al_ustr_new("Color:"),1, -1);
+    wz_create_toggle_button(gui, 0, 0, fsize*4, fsize*1.5, al_ustr_new("Any"), 1, 5, -1);
+    wz_create_toggle_button(gui, 0, 0, fsize*4, fsize*1.5, al_ustr_new("Black"), 1, 5, -1);
+    wz_create_toggle_button(gui, 0, 0, fsize*4, fsize*1.5, al_ustr_new("White"), 1, 5, -1);
+    return gui;
+}
+
+void add_gui(Board *b, ALLEGRO_EVENT_QUEUE *queue, WZ_WIDGET *gui){
+    wz_register_sources(gui, queue);
+    b->gui[b->gui_n] = gui;
+    b->gui_n++;
+}
+
+void remove_gui(Board *b, WZ_WIDGET *gui){
+    b->gui_n--;
+    b->gui[b->gui_n] = NULL;
+    wz_destroy(gui);
 }
 
 void create_board(Board *b){
@@ -386,18 +441,22 @@ void create_board(Board *b){
     b->x=0;
     b->y=0;
     b->pr = b->tsize * 0.45;
+    b->chat_term = term_create(80, 24);
     b->board_bmp = al_create_bitmap(b->size,b->size);
     al_set_target_bitmap(b->board_bmp);
     al_clear_to_color(NULL_COLOR);
     draw_board(b);
     al_set_target_bitmap(target);
-
+    b->gui_n = 0;
+    b->gui[0] = NULL;
+    b->term_show = 0;
+    
     create_info_gui(b);
 }
 
 void destroy_board(Board *b){
-    wz_destroy(i_gui);
-    i_gui = NULL;
+    wz_destroy(b->i_gui);
+    b->i_gui = NULL;
     ndestroy_bitmap(b->board_bmp);
 }
 
@@ -553,10 +612,13 @@ draw_stone(b, b->fi+i-1, b->fj+j-1, 0, b->lock_blk.b[i][j]);
     if((g->moves > 0) && b->draw_last) draw_last_move(g,b);
     
     // gui
-    wz_draw(i_gui);
-
-    al_draw_filled_rectangle(0,0, term->w*al_get_glyph_advance(fixed_font, '0', '0'), term->h*al_get_font_line_height(fixed_font), BLACK_COLOR);
-    term_draw(term, 0, 0, fixed_font, WHITE_COLOR);
+    for(i=0; i<b->gui_n; i++)
+        wz_draw(b->gui[i]);
+    
+    if(b->term_show){
+        al_draw_filled_rectangle(0,0, b->chat_term->w*al_get_glyph_advance(fixed_font, '0', '0'), b->chat_term->h*al_get_font_line_height(fixed_font), BLACK_COLOR);
+        term_draw(b->chat_term, 0, 0, fixed_font, WHITE_COLOR);
+    }
 }
     
     // xxx todo: draw rectangle at last move source & dest
@@ -830,6 +892,11 @@ int try_move(Game *g, Board *b, int i, int j){
     return ret;
 }
 
+void unlock_block(Game *g, Board *b){
+    drop_block(g->brd, b->lock_i, b->lock_j, &b->lock_blk);
+    b->lock = 0;
+}
+
 void process_irc_event(Game *g, Board *b, int type, ALLEGRO_USER_EVENT *ev)
 {
     char *origin, *msg; // we should free these
@@ -862,7 +929,8 @@ void process_irc_event(Game *g, Board *b, int type, ALLEGRO_USER_EVENT *ev)
                     emit_event(EVENT_RESTART);
 
                 }
-            } else if (!strcasecmp(msg, ":P1"))
+            }
+            else if (!strcasecmp(msg, ":P1"))
             {
                 b->opponent = strdup(origin);
                 b->game_state = GAME_PLAYING_IRC;
@@ -880,6 +948,11 @@ void process_irc_event(Game *g, Board *b, int type, ALLEGRO_USER_EVENT *ev)
                 b->allow_move = 1;
                 emit_event(EVENT_RESTART);
             }
+// xxx todo: log chat message into chat console.
+//            else
+//            {
+//                chat_msg_add(origin, msg);
+//            }
         }
         else if((b->game_state == GAME_PLAYING_IRC) && (g->turn != b->player)) // turn=2 instead?
         {
@@ -930,6 +1003,7 @@ void process_irc_event(Game *g, Board *b, int type, ALLEGRO_USER_EVENT *ev)
         }
     }
     
+        
     free(origin);
     free(msg);
 }
@@ -952,6 +1026,7 @@ int main(int argc, char **argv){
     char opponent[64] = "koro";
     int key_coords;
     int type_coords = 0;
+    int i;
     
     // seed random number generator. comment out for debug
     srand((unsigned int) time(NULL));
@@ -1059,9 +1134,8 @@ RESTART:
     b.lock = 0;
 
     // temp
-    wz_register_sources(i_gui, event_queue);
-    
-    int terminal_has_focus = 1;
+    add_gui(&b, event_queue, b.i_gui);
+//    wz_register_sources(b.i_gui, event_queue);
     
     while(noexit)
     {
@@ -1071,15 +1145,24 @@ RESTART:
         old_time = al_get_time();
 
         // temp
-        wz_update(i_gui, fixed_dt);
+        for(i=0; i<b.gui_n; i++){
+            wz_update(b.gui[i], fixed_dt); // we may not be refreshing changes in the gui!
+        }
+        
+        if(b.gui_n>1) redraw=1;
+        
         while(al_get_next_event(event_queue, &ev)){ // empty out the event queue
-            // temp
-            wz_send_event(i_gui, &ev);
+            if(ev.type == ALLEGRO_EVENT_DISPLAY_HALT_DRAWING){
+                // first thing to process
+                deblog("RECEIVED HALT");
+                break;
+            }
+            
+            // send event to topmost gui
+            if(b.gui_n) // ignore mouse events if focus is in gui
+                wz_send_event(b.gui[b.gui_n-1], &ev);
 
             switch(ev.type){
-                case ALLEGRO_EVENT_DISPLAY_HALT_DRAWING:
-                    deblog("RECEIVED HALT");
-                    break;
                 case EVENT_RESTART:
                     destroy_game(&g);
                     destroy_board(&b);
@@ -1093,6 +1176,19 @@ RESTART:
                 case ALLEGRO_EVENT_DISPLAY_CLOSE:
                     emit_event(EVENT_EXIT);
                     break;
+                    
+                case WZ_BUTTON_PRESSED:
+                    switch ((int)ev.user.data1)
+                    {
+                        case BUTTON_SETTINGS:
+                            add_gui(&b, event_queue, create_settings_gui(&b));
+                            //wz_attach(create_settings_gui(&b), b.i_gui);
+                            break;
+                        case BUTTON_CHAT:
+                            SWITCH(b.term_show);
+                            redraw=1;
+                            break;
+                    }
                     
                 case EVENT_IRC_JOIN:
                     break;
@@ -1125,14 +1221,8 @@ RESTART:
                 case ALLEGRO_EVENT_KEY_CHAR:
                     keypress=1;
                     
-                    if(terminal_has_focus){
-                        if(ev.keyboard.keycode == ALLEGRO_KEY_BACKSPACE){
-                            term_backspace(term);
-                        } else if(ev.keyboard.keycode == ALLEGRO_KEY_ENTER){
-                            term_enter(term);
-                        } else {
-                            term_append_char(term, ev.keyboard.unichar);
-                        }
+                    if(b.term_show){
+                        term_input(b.chat_term, ev.keyboard.keycode, ev.keyboard.unichar);
                         redraw = 1;
                     } else {
                         switch(ev.keyboard.keycode){
@@ -1183,8 +1273,8 @@ RESTART:
                                 b.game_state = GAME_SEEKING;
                                 break;
                                 
-                            case ALLEGRO_KEY_T:
-                                term_add_line(term, "This is a test line.");
+                            case ALLEGRO_KEY_EQUALS:
+                                b.term_show=1;
                                 redraw=1;
                                 break;
                                 
@@ -1230,7 +1320,7 @@ RESTART:
 			al_acknowledge_resize(display);
             destroy_board(&b); // fix this
             create_board(&b);
-            wz_register_sources(i_gui, event_queue);
+            wz_register_sources(b.i_gui, event_queue);
 
 //            al_resize_display(display, b.size + 1, b.size + 1);
             al_set_target_backbuffer(display);

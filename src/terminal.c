@@ -50,24 +50,45 @@ void copy_next_line(char *dest, char *str, int width, char **ptr){
     dest[optr-*ptr] = 0;
 }
 
-void term_append_char(Terminal *t, int *c){
-    if(t->cursor >= TERM_LINE_SIZE) return;
-    t->buf[t->cursor] = (char) c;
-    t->cursor++;
-    t->buf[t->cursor] = 0;
+void term_input(Terminal *t, int allegro_keycode, int *c){
+    switch(allegro_keycode){
+        case ALLEGRO_KEY_BACKSPACE:
+            if(t->cursor == 0) return;
+            t->cursor--;
+            t->buf[t->cursor]=0;
+            return;
+        case ALLEGRO_KEY_ENTER:
+            term_add_line(t, t->buf);
+            t->cursor = 0;
+            t->buf[0] = 0;
+            return;
+        default:
+            if(t->cursor >= TERM_LINE_SIZE) return;
+            t->buf[t->cursor] = (char) c;
+            t->cursor++;
+            t->buf[t->cursor] = 0;
+    }
 }
 
-void term_backspace(Terminal *t){
-    if(t->cursor == 0) return;
-    t->cursor--;
-    t->buf[t->cursor]=0;
-}
-
-void term_enter(Terminal *t){
-    term_add_line(t, t->buf);
-    t->cursor = 0;
-    t->buf[0] = 0;
-}
+//
+//void term_append_char(Terminal *t, int *c){
+//    if(t->cursor >= TERM_LINE_SIZE) return;
+//    t->buf[t->cursor] = (char) c;
+//    t->cursor++;
+//    t->buf[t->cursor] = 0;
+//}
+//
+//void term_backspace(Terminal *t){
+//    if(t->cursor == 0) return;
+//    t->cursor--;
+//    t->buf[t->cursor]=0;
+//}
+//
+//void term_enter(Terminal *t){
+//    term_add_line(t, t->buf);
+//    t->cursor = 0;
+//    t->buf[0] = 0;
+//}
 
 /* prints displayed part of terminal to a string and returns pointer to it */
 /* currently assumes terminal is at bottom */
@@ -76,29 +97,46 @@ char *term_print_str(Terminal *t){
     char *str = malloc((t->w+1)*(t->h - 1)*sizeof(char));
     memset(str, 0, (t->w+1)*(t->h - 1)*sizeof(char));
     int l = 1;
+    int sl= t->h-2;
+    int offset;
     char *line;
-    char *ptr;
+    int len;
     
     do{
         line = t->line[nmod(t->pos-l, MAX_TERM_LINES)];
-        if(!line) break;
-        ptr = line + strlen(line);
-        do{
-            copy_next_line(str + (t->w+1)*(t->h-1-l), line, t->w, &ptr);
-            l++;
-        } while((ptr > line) && (l<=t->h-1));
-    } while(l<=t->h-1);
+        if(!line){
+            memset(str, 0, t->w*sl);
+            break;
+        }
+        len=strlen(line);
+        offset = t->w * ((len-1)/t->w);
+        strncpy(str+t->w*sl, line + offset, t->w);
+        if(len % t->w) str[t->w*sl+len-offset] = 0; // add null terminating character if required
+        
+        sl--;
+        offset -= t->w;
+        while((offset>=0) && (sl >= 0)){
+            strncpy(str+t->w*sl, line + offset, t->w);
+            sl--;
+            offset -= t->w;
+        }
+        l++;
+    } while(sl>=0);
+    str[(t->h-1)*t->w] = 0; // final null character
     return str;
 }
 
 void term_draw(Terminal *t, int x, int y, ALLEGRO_FONT *font, ALLEGRO_COLOR color){
     char *str = term_print_str(t);
+    char temp[t->w+1];
     int i, th, shift;
     
     th = al_get_font_line_height(font);
     
     for(i=0; i<t->h-1;i++){
-        al_draw_text(font, color, x, y + i*th, ALLEGRO_ALIGN_LEFT, str + (t->w+1)*i);
+        strncpy(temp, str+(t->w*i), t->w);
+        temp[t->w] = 0;
+        al_draw_text(font, color, x, y + i*th, ALLEGRO_ALIGN_LEFT, temp);
     }
     
     shift = (t->cursor-1)/t->w;
