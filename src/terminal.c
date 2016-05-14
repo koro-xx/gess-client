@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "macros.h"
+#include <allegro5/allegro_primitives.h>
 
 Terminal *term_create(int w, int h){
     Terminal *t = malloc(sizeof *t);
@@ -11,6 +12,7 @@ Terminal *term_create(int w, int h){
     t->w = w;
     t->h = h;
     t->cursor = 0;
+    t->input = 0;
     return t;
 }
 
@@ -94,10 +96,11 @@ void term_input(Terminal *t, int allegro_keycode, int *c){
 /* currently assumes terminal is at bottom */
 
 char *term_print_str(Terminal *t){
-    char *str = malloc((t->w+1)*(t->h - 1)*sizeof(char));
-    memset(str, 0, (t->w+1)*(t->h - 1)*sizeof(char));
+    int th = t->input ? t->h-1 : t->h;
+    char *str = malloc((t->w+1)*th*sizeof(char));
+    memset(str, 0, (t->w+1)*(th - 1)*sizeof(char));
     int l = 1;
-    int sl= t->h-2;
+    int sl= th-1;
     int offset;
     char *line;
     int len;
@@ -122,23 +125,27 @@ char *term_print_str(Terminal *t){
         }
         l++;
     } while(sl>=0);
-    str[(t->h-1)*t->w] = 0; // final null character
+    str[th*t->w] = 0; // final null character
     return str;
 }
 
-void term_draw(Terminal *t, int x, int y, ALLEGRO_FONT *font, ALLEGRO_COLOR color){
+void term_draw(Terminal *t, int x, int y, ALLEGRO_FONT *font, ALLEGRO_COLOR fg_color, ALLEGRO_COLOR bg_color){
     char *str = term_print_str(t);
     char temp[t->w+1];
     int i, th, shift;
     
     th = al_get_font_line_height(font);
     
-    for(i=0; i<t->h-1;i++){
+    al_draw_filled_rectangle(x,y, x + t->w*al_get_glyph_advance(font, '0', '0'), y + t->h*th, bg_color);
+    
+    for(i=0; i<t->h-t->input;i++){
         strncpy(temp, str+(t->w*i), t->w);
         temp[t->w] = 0;
-        al_draw_text(font, color, x, y + i*th, ALLEGRO_ALIGN_LEFT, temp);
+        al_draw_text(font, fg_color, x, y + i*th, ALLEGRO_ALIGN_LEFT, temp);
     }
     
-    shift = (t->cursor-1)/t->w;
-    al_draw_text(font, color, x, y+(t->h-1)*th, ALLEGRO_ALIGN_LEFT, t->buf+shift*t->w);
+    if(t->input){
+        shift = (t->cursor-1)/t->w;
+        al_draw_text(font, fg_color, x, y+(t->h-1)*th, ALLEGRO_ALIGN_LEFT, t->buf+shift*t->w);
+    }
 }

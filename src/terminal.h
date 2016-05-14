@@ -27,10 +27,12 @@ typedef struct Terminal{
     int cursor;
 ///* scrollback position */
 //    int scrollback;
+/* do we want to handle input? */
+    int input;
 } Terminal;
 
 
-void term_draw(Terminal *t, int x, int y, ALLEGRO_FONT *font, ALLEGRO_COLOR color);
+void term_draw(Terminal *t, int x, int y, ALLEGRO_FONT *font, ALLEGRO_COLOR fg_color, ALLEGRO_COLOR bg_color);
 int term_add_line(Terminal *t, char *str);
 void term_destroy(Terminal *t);
 Terminal *term_create(int w, int h);

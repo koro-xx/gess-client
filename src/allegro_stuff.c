@@ -10,6 +10,7 @@
 
 MemFile text_font_mem={0};;
 const char *TEXT_FONT_FILE = "fonts/DroidSansMono.ttf"; //`"fonts/text_font.ttf";
+const ALLEGRO_USTR *USTR_NULL;
 
 struct Buffer_USTR{
     ALLEGRO_USTR *ustr;
@@ -97,6 +98,8 @@ int init_allegro(void){
     deblog("initialized primitives addon");
 
     if(init_fonts()) return -1;
+    
+    USTR_NULL = al_ustr_new("");
 	return 0;
 };
 
