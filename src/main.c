@@ -48,6 +48,13 @@ char opponent_nick[32];
 ALLEGRO_EVENT_SOURCE user_event_src;
 ALLEGRO_EVENT_QUEUE *event_queue = NULL;
 
+struct Settings_GUI_el{
+    WZ_EDITBOX *server;
+    WZ_EDITBOX *port;
+    WZ_EDITBOX *nick;
+    WZ_EDITBOX *channel;
+    WZ_BUTTON *request_color;
+};
 
 float RESIZE_DELAY = 0.04;
 float fixed_dt = 1.0/FPS;
@@ -107,9 +114,7 @@ void emit_event(int event_type){
 }
 
 void init_board(Board *b){
-    static char nick[10];
-    sprintf(nick, "gess%d", rand()%10000);
-   
+
     b->pcolor[0] = NULL_COLOR;
     b->pcolor[1] = al_map_rgb(220, 220, 220);
     b->pcolor[2] = al_map_rgb(60, 60, 60);
@@ -119,16 +124,25 @@ void init_board(Board *b){
     
     b->game_state = GAME_PLAYING;
     
-    b->server = "irc.freenode.org";
-    b->nick = nick;
+    b->server = strdup("irc.freenode.org");
+    b->nick = malloc(10*sizeof(char));
+    sprintf(b->nick, "gess%d", rand()%10000);
     b->port = 6667;
-    b->channel = "#lalala";
+    b->channel = strdup("#lalala");
     b->connected = 0;
     b->allow_move = 1;
     b->chat_term = term_create(80, 24);
     b->opponent = NULL;
     b->irc_status_msg = al_ustr_new("Disconnected");
     b->request_player = 0;
+    
+    // xxx todo: fix this shit (don't create them, let the gui create them)
+    b->s_server = al_ustr_new("");
+    b->s_port = al_ustr_new("");
+    b->s_channel = al_ustr_new("");
+    b->s_nick = al_ustr_new("");
+    b->s_color = al_ustr_new("");
+
    // b->game_type = ?
 }
 
@@ -177,8 +191,11 @@ WZ_WIDGET* create_settings_gui(Board *b){
     int gui_w = b->xsize*0.7;
     int gui_h = b->ysize*0.8;
     int fsize = b->tsize*0.6;
+    int lh=3;
     WZ_WIDGET *gui;
     static WZ_DEF_THEME theme;
+    
+    
     /*
      Define custom theme
      wz_def_theme is a global vtable defined by the header
@@ -190,18 +207,37 @@ WZ_WIDGET* create_settings_gui(Board *b){
     theme.color2 = al_map_rgba_f(1, 1, 1,1);
     gui = wz_create_widget(0, (b->xsize-gui_w)/2, (b->ysize-gui_h)/2, GUI_SETTINGS);
     wz_set_theme(gui, (WZ_THEME*)&theme);
-    wz_create_fill_layout(gui, 0, 0, gui_w, fsize*4, fsize, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_TOP, -1);
-    wz_create_textbox(gui, 0, 0, fsize*10, fsize*2, WZ_ALIGN_RIGHT, WZ_ALIGN_CENTRE, al_ustr_new("IRC Nickname:"),1, -1);
-    wz_create_editbox(gui, 0, 0, gui_w/2.5, fsize*2, al_ustr_new(b->nick), 1, -1);
-    wz_create_fill_layout(gui, 0, fsize*4, gui_w, fsize*4, fsize, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_TOP, -1);
-    wz_create_textbox(gui, 0, 0, fsize*10, fsize*2, WZ_ALIGN_RIGHT, WZ_ALIGN_CENTRE, al_ustr_new("IRC Server:"),1, -1);
-    wz_create_editbox(gui, 0, 0, gui_w/2.5, fsize*2, al_ustr_new(b->server), 1, -1);
+    wz_create_fill_layout(gui, 0, 0, gui_w, fsize*lh, fsize, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, -1);
+    wz_create_textbox(gui, 0, 0, fsize*7, fsize*1.5, WZ_ALIGN_RIGHT, WZ_ALIGN_CENTRE, al_ustr_new("IRC Server:"),1, -1);
+    al_ustr_assign_cstr(b->s_server, b->server);
+    wz_create_editbox(gui, 0, 0, gui_w/2.5, fsize*1.5, b->s_server, 0, -1);
     
-    wz_create_fill_layout(gui, 0, fsize*8, gui_w, fsize*4, fsize, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_TOP, -1);
-    wz_create_textbox(gui, 0, 0, fsize*10, fsize*2, WZ_ALIGN_RIGHT, WZ_ALIGN_CENTRE, al_ustr_new("Color:"),1, -1);
-    wz_create_toggle_button(gui, 0, 0, fsize*4, fsize*1.5, al_ustr_new("Any"), 1, 5, -1);
-    wz_create_toggle_button(gui, 0, 0, fsize*4, fsize*1.5, al_ustr_new("Black"), 1, 5, -1);
-    wz_create_toggle_button(gui, 0, 0, fsize*4, fsize*1.5, al_ustr_new("White"), 1, 5, -1);
+    wz_create_textbox(gui, 0, 0, fsize*1, fsize*1.5, WZ_ALIGN_RIGHT, WZ_ALIGN_CENTRE, al_ustr_new(":"),1, -1);
+    
+    al_ustr_free(b->s_port);
+    b->s_port = al_ustr_newf("%d", b->port);
+    wz_create_editbox(gui, 0, 0, fsize*4, fsize*1.5, b->s_port, 0, -1);
+    
+    
+    wz_create_fill_layout(gui, 0, fsize*lh, gui_w, fsize*lh, fsize, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, -1);
+    wz_create_textbox(gui, 0, 0, fsize*10, fsize*1.5, WZ_ALIGN_RIGHT, WZ_ALIGN_CENTRE, al_ustr_new("IRC Channel:"),1, -1);
+    al_ustr_assign_cstr(b->s_channel, b->channel);
+    wz_create_editbox(gui, 0, 0, gui_w/2.5, fsize*1.5, b->s_channel, 0, -1);
+    
+    wz_create_fill_layout(gui, 0, fsize*lh*2, gui_w, fsize*lh, fsize, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, -1);
+    
+    al_ustr_assign_cstr(b->s_nick, b->nick);
+    wz_create_textbox(gui, 0, 0, fsize*10, fsize*1.5, WZ_ALIGN_RIGHT, WZ_ALIGN_CENTRE, al_ustr_new("IRC Nickname:"),1, -1);
+    wz_create_editbox(gui, 0, 0, gui_w/2.5, fsize*1.5, b->s_nick, 0, -1);
+
+    wz_create_fill_layout(gui, 0, fsize*lh*3, gui_w, fsize*lh, fsize, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, -1);
+    wz_create_textbox(gui, 0, 0, fsize*10, fsize*1.5, WZ_ALIGN_RIGHT, WZ_ALIGN_CENTRE, al_ustr_new("Color request:"),1, -1);
+    al_ustr_assign_cstr(b->s_color, b->request_player ? ((b->request_player == 1) ? "White" : "Black") : "Any");
+    wz_create_button(gui, 0, 0, fsize*4, fsize*1.5, b->s_color, 0, BUTTON_COLOR);
+    
+    wz_create_fill_layout(gui, 0, fsize*lh*4, gui_w, fsize*lh, fsize*3, fsize, WZ_ALIGN_RIGHT, WZ_ALIGN_CENTRE, -1);
+    wz_create_button(gui, 0, 0, fsize*4, fsize*1.5, al_ustr_new("OK"), 1, BUTTON_OK);
+    wz_create_button(gui, 0, 0, fsize*4, fsize*1.5, al_ustr_new("Cancel"), 1, BUTTON_CANCEL);
     return gui;
 }
 
@@ -241,6 +277,79 @@ void remove_gui(Board *b){
     wz_destroy(b->gui[b->gui_n]);
     b->gui[b->gui_n] = NULL;
 }
+
+//xxx todo: add struct for settings
+void settings_apply(Board *b, Game *g, ALLEGRO_EVENT *ev, ALLEGRO_EVENT_QUEUE *queue){
+    al_free(b->server);
+    b->server = al_cstr_dup(b->s_server);
+    b->port = atoi(al_cstr(b->s_port));
+    al_free(b->channel);
+    b->channel = al_cstr_dup(b->s_channel);
+    al_free(b->nick);
+    b->nick = al_cstr_dup(b->s_nick);
+
+    if(al_ustr_has_prefix_cstr(b->s_color, "White"))
+    {
+        b->request_player = 1;
+    } else if (al_ustr_has_prefix_cstr(b->s_color, "Black"))
+    {
+        b->request_player = 2;
+    } else
+        b->request_player = 0;
+    
+    remove_gui(b);
+}
+
+void gui_handler(Board *b, Game *g, ALLEGRO_EVENT *ev, ALLEGRO_EVENT_QUEUE *queue){
+    WZ_WIDGET* wgt = (WZ_WIDGET *)ev->user.data2;
+    if(!wgt->parent) return; // just in case
+    
+    switch(wgt->parent->id)
+    {
+        case GUI_SETTINGS:
+        {
+            if(ev->type == WZ_BUTTON_PRESSED){
+                switch(ev->user.data1){
+                    case BUTTON_OK:
+                        settings_apply(b, g, ev, queue);
+                        break;
+                    case BUTTON_CANCEL:
+                        remove_gui(b);
+                        break;
+                    case BUTTON_COLOR:
+                        //switch color option
+                        break;
+                }
+            }
+            break;
+        }
+        case GUI_INFO:
+        {
+            if(ev->type == WZ_BUTTON_PRESSED){
+                switch(ev->user.data1){
+                    case BUTTON_SETTINGS:
+                        add_gui(b, queue, create_settings_gui(b));
+                        break;
+                    case BUTTON_CHAT:
+                        add_gui(b, event_queue, create_term_gui(b, b->chat_term, GUI_CHAT));
+                        break;
+                }
+            }
+            break;
+        }
+        case GUI_CHAT:
+        {
+            if(ev->type == WZ_TEXT_CHANGED){
+             // xxx todo: check that satus is playing on irc and opponent exists!
+                send_privmsg(b, b->opponent, (char *) al_cstr(((WZ_EDITBOX*)wgt)->text));
+                wz_set_text(wgt, USTR_NULL);
+            }
+            break;
+        }
+    }
+}
+
+
 
 void create_board(Board *b){
     ALLEGRO_BITMAP *target = al_get_target_bitmap();
@@ -648,6 +757,7 @@ RESTART:
 //	al_convert_bitmaps(); // turn bitmaps to memory bitmaps after resize (bug in allegro doesn't autoconvert)
 
     
+    /// need to move this before restart!!!
     event_queue = al_create_event_queue();
     if(!event_queue) {
         fprintf(stderr, "failed to create event_queue!\n");
@@ -733,36 +843,34 @@ RESTART:
                     break;
                     
                 case WZ_BUTTON_PRESSED:
-                    switch ((int)ev.user.data1)
-                    {
-                        case BUTTON_SETTINGS:
-                            add_gui(&b, event_queue, create_settings_gui(&b));
-                            redraw=1;
-                            break;
-                        case BUTTON_CHAT:
-                            add_gui(&b, event_queue, create_term_gui(&b, b.chat_term, GUI_CHAT));
-                            redraw=1;
-                            break;
-                    }
                 case WZ_TEXT_CHANGED:
-                {
-                    WZ_WIDGET *wgt = (WZ_WIDGET*) ev.user.data2;
-                    if(wgt->parent && wgt->parent->id == GUI_CHAT)
-                    { // xxx todo: check that satus is playing on irc and opponent exists!
-                        send_privmsg(&b, b.opponent, (char *) al_cstr(((WZ_EDITBOX*)wgt)->text));
-                     //   term_add_line(b.chat_term, (char *) al_cstr(((WZ_EDITBOX*)wgt)->text));
-                        wz_set_text(wgt, USTR_NULL);
-                    }
-                    else if (wgt->id == GUI_SERVER_TEXT)
-                    {
-                        //change server name
-                    }
-                    else if (wgt->id == GUI_NICK_TEXT)
-                    {
-                        // change nick text
-                    }
+                    gui_handler(&b, &g, &ev, event_queue);
                     redraw=1;
-                }
+                    break;
+//                    
+//                case WZ_BUTTON_PRESSED:
+//                    switch ((int)ev.user.data1)
+//                    {
+//                        case BUTTON_SETTINGS:
+//                            add_gui(&b, event_queue, create_settings_gui(&b));
+//                            redraw=1;
+//                            break;
+//                        case BUTTON_CHAT:
+//                            add_gui(&b, event_queue, create_term_gui(&b, b.chat_term, GUI_CHAT));
+//                            redraw=1;
+//                            break;
+//                    }
+//                case WZ_TEXT_CHANGED:
+//                {
+//                    WZ_WIDGET *wgt = (WZ_WIDGET*) ev.user.data2;
+//                    if(wgt->parent && wgt->parent->id == GUI_CHAT)
+//                    { // xxx todo: check that satus is playing on irc and opponent exists!
+//                        send_privmsg(&b, b.opponent, (char *) al_cstr(((WZ_EDITBOX*)wgt)->text));
+//                     //   term_add_line(b.chat_term, (char *) al_cstr(((WZ_EDITBOX*)wgt)->text));
+//                        wz_set_text(wgt, USTR_NULL);
+//                    }
+//                    redraw=1;
+//                }
                 case EVENT_IRC_JOIN:
                     break;
                     

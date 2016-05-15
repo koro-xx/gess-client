@@ -50,8 +50,9 @@ enum { // gui elements
     GUI_INFO,
     GUI_SETTINGS,
     GUI_CHAT,
-    GUI_SERVER_TEXT,
-    GUI_NICK_TEXT,
+    BUTTON_OK,
+    BUTTON_CANCEL,
+    BUTTON_COLOR,
     BUTTON_SETTINGS,
     BUTTON_CHAT,
 };
@@ -132,8 +133,16 @@ typedef struct Board {
     WZ_WIDGET* settings_gui;
     
     //  extra displayed guis (in stack order)
-    WZ_WIDGET* gui[5];
+    WZ_WIDGET *gui[5];
+    void *guiel[5];
     int gui_n;
+    
+    // settings gui helper (move all settings to a signle struct later!)
+    ALLEGRO_USTR *s_server;
+    ALLEGRO_USTR *s_port;
+    ALLEGRO_USTR *s_channel;
+    ALLEGRO_USTR *s_nick;
+    ALLEGRO_USTR *s_color;
 } Board;
 
 
