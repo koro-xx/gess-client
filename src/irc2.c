@@ -158,8 +158,11 @@ void *create_irc_thread(ALLEGRO_THREAD *thr, void *arg){
         printf("Attempt to connect %i/10...\n", i);
         if ( irc_run (g_irc_s) )
             sleep(1);
+        else
+            break;
         printf ("Could not connect or I/O error: %s\n", irc_strerror(irc_errno(g_irc_s)));
     }
+    emit_event(EVENT_IRC_DISCONNECT);
     return NULL;
 }
 

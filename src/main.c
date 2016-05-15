@@ -43,18 +43,9 @@ char opponent_nick[32];
 //#define MOVE_COLOR al_premul_rgba(255, 255, 0, 100)
 
 // this is mainly for testing, not actually used. use emit_event(EVENT_TYPE) to emit user events.
-#define BASE_USER_EVENT_TYPE ALLEGRO_GET_EVENT_TYPE('c','c','c','c')
-#define EVENT_REDRAW (BASE_USER_EVENT_TYPE + 1)
 ALLEGRO_EVENT_SOURCE user_event_src;
 ALLEGRO_EVENT_QUEUE *event_queue = NULL;
 
-struct Settings_GUI_el{
-    WZ_EDITBOX *server;
-    WZ_EDITBOX *port;
-    WZ_EDITBOX *nick;
-    WZ_EDITBOX *channel;
-    WZ_BUTTON *request_color;
-};
 
 float RESIZE_DELAY = 0.04;
 float fixed_dt = 1.0/FPS;
@@ -78,7 +69,7 @@ void chat_term_add_line(Terminal *t, char *origin, char *msg){
 void send_privmsg(Board *b, char *nick, char *msg){
     if(nick) irc_cmd_msg(g_irc_s, nick, msg);
     deblog("SENT: %s | %s", nick, msg);
-    chat_term_add_line(b->chat_term, b->nick, msg);
+    chat_term_add_line(b->chat_term, al_cstr(b->nick), msg);
 }
 
 void acknowledge_privmsg(Board *b, char *nick, char *msg){
@@ -91,7 +82,7 @@ void send_move(Game *g, Board *b){
     char move[32];
     snprintf(move, 32, ":%d,%s", g->moves, g->brd->last_move);
 //    strcpy(move+1, g->brd->last_move);
-    send_privmsg(b, b->opponent, move);
+    send_privmsg(b, al_cstr(b->opponent), move);
 //    b->game_state = GAME_WAITING_MOVE_ACK;
     b->allow_move = 0;
 }
@@ -113,6 +104,13 @@ void emit_event(int event_type){
     al_emit_user_event(&user_event_src, &user_event, NULL);
 }
 
+void try_irc_connect(Board *b){
+    IRC_connect(al_cstr(b->server), b->port, al_cstr(b->nick), al_cstr(b->channel));
+    al_ustr_assign_cstr(b->irc_status_msg, "Connecting...");
+    b->connected = -1; //connecting
+    emit_event(EVENT_REDRAW);
+}
+
 void init_board(Board *b){
 
     b->pcolor[0] = NULL_COLOR;
@@ -124,15 +122,14 @@ void init_board(Board *b){
     
     b->game_state = GAME_PLAYING;
     
-    b->server = strdup("irc.freenode.org");
-    b->nick = malloc(10*sizeof(char));
-    sprintf(b->nick, "gess%d", rand()%10000);
+    b->server = al_ustr_new("irc.freenode.org");
+    b->nick = al_ustr_newf("gess%d", rand()%10000);
     b->port = 6667;
-    b->channel = strdup("#lalala");
+    b->channel = al_ustr_new("#lalala");
     b->connected = 0;
     b->allow_move = 1;
     b->chat_term = term_create(80, 24);
-    b->opponent = NULL;
+    b->opponent = al_ustr_new("");
     b->irc_status_msg = al_ustr_new("Disconnected");
     b->request_player = 0;
     
@@ -142,7 +139,9 @@ void init_board(Board *b){
     b->s_channel = al_ustr_new("");
     b->s_nick = al_ustr_new("");
     b->s_color = al_ustr_new("");
-
+    b->s_player1_name = al_ustr_new("Player 1");
+    b->s_player2_name = al_ustr_new("Player 2");
+    
    // b->game_type = ?
 }
 
@@ -154,7 +153,6 @@ void create_info_gui(Board *b){
     int fsize = b->tsize*0.5;
     WZ_WIDGET *gui;
     static WZ_DEF_THEME theme;
-    
     b->font = load_font_mem(text_font_mem, TEXT_FONT_FILE, -fsize);
     
     /*
@@ -167,21 +165,27 @@ void create_info_gui(Board *b){
     theme.color1 = al_map_rgba_f(.5, .5, .5, 1);
     theme.color2 = al_map_rgba_f(1, 1, 1,1);
     
-    gui = wz_create_widget(0, b->x + b->size, 0, GUI_INFO);
+    gui = wz_create_widget(0, b->x + b->size, b->y, GUI_INFO);
     wz_set_theme(gui, (WZ_THEME*)&theme);
-    wz_create_fill_layout(gui, 0, 0, gui_w, gui_h/3, fsize/2, fsize/3, WZ_ALIGN_CENTRE, WZ_ALIGN_TOP, -1);
-    wz_create_textbox(gui, 0, 0, gui_w-fsize, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, al_ustr_new("Player 2"),1, -1);
-    wz_create_fill_layout(gui, 0, gui_h/3, gui_w, gui_h/3, fsize/2, fsize/3, WZ_ALIGN_CENTRE, WZ_ALIGN_TOP, -1);
-    wz_create_textbox(gui, 0, 0, gui_w-fsize, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, al_ustr_newf("%s:%d", b->server, b->port), 1, -1);
-    wz_create_textbox(gui, 0, 0, gui_w-fsize, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, al_ustr_newf("Nickname: %s", b->nick), 1, -1);
-    //wz_create_textbox(gui, 0, 0, gui_w-fsize, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, al_ustr_newf("%s", b->connected ? "Connected" : "Disconnected"), 1, -1);
-    wz_create_textbox(gui, 0, 0, gui_w-fsize, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, b->irc_status_msg, 0, -1);
+    wz_create_fill_layout(gui, 0, 0, gui_w, gui_h/3, fsize/2, fsize/3, WZ_ALIGN_LEFT, WZ_ALIGN_TOP, -1);
+    wz_create_textbox(gui, 0, 0, gui_w-fsize, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, b->s_player2_name,0, -1);
+    wz_create_fill_layout(gui, 0, gui_h/3, gui_w, gui_h/3, fsize/2, fsize/3, WZ_ALIGN_LEFT, WZ_ALIGN_TOP, -1);
+  
+    wz_create_button(gui, 0, 0, fsize*10, fsize*1.5, b->irc_status_msg, 0, BUTTON_IRC_STATUS);
+    
+//    wz_create_textbox(gui, 0, 0, gui_w-fsize, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, b->irc_status_msg, 0, -1);
+    wz_create_textbox(gui, 0, 0, gui_w-fsize, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, b->server, 0, -1);
+    wz_create_textbox(gui, 0, 0, al_get_text_width(b->font, "Nick:"), fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, al_ustr_new("Nick:"), 1, -1);
+    wz_create_textbox(gui, 0, 0, gui_w-al_get_text_width(b->font, "Nick:")-fsize, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, b->nick, 0, -1);
 
-    wz_create_box(gui, 0, 0, gui_w-fsize, fsize, -1); //xxx must hide box
+    
+    wz_create_box(gui, 0, 0, gui_w, fsize, -1); //xxx must hide box
     wz_create_button(gui, 0, 0, fsize*5, fsize*1.5, al_ustr_new("Settings"), 1, BUTTON_SETTINGS);
     wz_create_button(gui, 0, 0, fsize*5, fsize*1.5, al_ustr_new("Chat"), 1, BUTTON_CHAT);
+    wz_create_button(gui, 0, 0, fsize*5, fsize*1.5, al_ustr_new("Action"), 1, BUTTON_ACTION);
+    
     wz_create_fill_layout(gui, 0, 2*gui_h/3, gui_w, gui_h/3, fsize/2, fsize/3, WZ_ALIGN_CENTRE, WZ_ALIGN_TOP, -1);
-    wz_create_textbox(gui, 0, 0, gui_w-fsize, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, al_ustr_new("Player 1"),1, -1);
+    wz_create_textbox(gui, 0, 0, gui_w-fsize, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, b->s_player1_name,0, -1);
     
     b->i_gui = gui;
 }
@@ -209,7 +213,7 @@ WZ_WIDGET* create_settings_gui(Board *b){
     wz_set_theme(gui, (WZ_THEME*)&theme);
     wz_create_fill_layout(gui, 0, 0, gui_w, fsize*lh, fsize, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, -1);
     wz_create_textbox(gui, 0, 0, fsize*7, fsize*1.5, WZ_ALIGN_RIGHT, WZ_ALIGN_CENTRE, al_ustr_new("IRC Server:"),1, -1);
-    al_ustr_assign_cstr(b->s_server, b->server);
+    al_ustr_assign(b->s_server, b->server);
     wz_create_editbox(gui, 0, 0, gui_w/2.5, fsize*1.5, b->s_server, 0, -1);
     
     wz_create_textbox(gui, 0, 0, fsize*1, fsize*1.5, WZ_ALIGN_RIGHT, WZ_ALIGN_CENTRE, al_ustr_new(":"),1, -1);
@@ -221,18 +225,19 @@ WZ_WIDGET* create_settings_gui(Board *b){
     
     wz_create_fill_layout(gui, 0, fsize*lh, gui_w, fsize*lh, fsize, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, -1);
     wz_create_textbox(gui, 0, 0, fsize*10, fsize*1.5, WZ_ALIGN_RIGHT, WZ_ALIGN_CENTRE, al_ustr_new("IRC Channel:"),1, -1);
-    al_ustr_assign_cstr(b->s_channel, b->channel);
+    al_ustr_assign(b->s_channel, b->channel);
     wz_create_editbox(gui, 0, 0, gui_w/2.5, fsize*1.5, b->s_channel, 0, -1);
     
     wz_create_fill_layout(gui, 0, fsize*lh*2, gui_w, fsize*lh, fsize, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, -1);
     
-    al_ustr_assign_cstr(b->s_nick, b->nick);
+    al_ustr_assign(b->s_nick, b->nick);
     wz_create_textbox(gui, 0, 0, fsize*10, fsize*1.5, WZ_ALIGN_RIGHT, WZ_ALIGN_CENTRE, al_ustr_new("IRC Nickname:"),1, -1);
     wz_create_editbox(gui, 0, 0, gui_w/2.5, fsize*1.5, b->s_nick, 0, -1);
 
     wz_create_fill_layout(gui, 0, fsize*lh*3, gui_w, fsize*lh, fsize, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, -1);
     wz_create_textbox(gui, 0, 0, fsize*10, fsize*1.5, WZ_ALIGN_RIGHT, WZ_ALIGN_CENTRE, al_ustr_new("Color request:"),1, -1);
-    al_ustr_assign_cstr(b->s_color, b->request_player ? ((b->request_player == 1) ? "White" : "Black") : "Any");
+    al_ustr_free(b->s_color);
+    b->s_color = al_ustr_new(b->request_player ? ((b->request_player == 1) ? "White" : "Black") : "Any");
     wz_create_button(gui, 0, 0, fsize*4, fsize*1.5, b->s_color, 0, BUTTON_COLOR);
     
     wz_create_fill_layout(gui, 0, fsize*lh*4, gui_w, fsize*lh, fsize*3, fsize, WZ_ALIGN_RIGHT, WZ_ALIGN_CENTRE, -1);
@@ -240,6 +245,35 @@ WZ_WIDGET* create_settings_gui(Board *b){
     wz_create_button(gui, 0, 0, fsize*4, fsize*1.5, al_ustr_new("Cancel"), 1, BUTTON_CANCEL);
     return gui;
 }
+
+WZ_WIDGET* create_action_gui(Board *b){
+    //xxx assume that screen is wider than taller for now
+    int gui_w = b->xsize - b->size - b->x;
+    int gui_h = b->size;
+    int fsize = b->tsize*0.6;
+    WZ_WIDGET *gui;
+    static WZ_DEF_THEME theme;
+    
+    /*
+     Define custom theme
+     wz_def_theme is a global vtable defined by the header
+     */
+    memset(&theme, 0, sizeof(theme));
+    memcpy(&theme, &wz_def_theme, sizeof(theme));
+    theme.font = b->font;
+    theme.color1 = al_map_rgba_f(.5, .5, .5, 1);
+    theme.color2 = al_map_rgba_f(1, 1, 1,1);
+    
+    gui = wz_create_widget(0, b->x + b->size, b->y, GUI_ACTION);
+    wz_set_theme(gui, (WZ_THEME*)&theme);
+    wz_create_fill_layout(gui, 0, 0, gui_w, gui_h, fsize, fsize*3, WZ_ALIGN_CENTRE, WZ_ALIGN_CENTRE, -1);
+    wz_create_button(gui, 0, 0, fsize*7, fsize*1.5, al_ustr_new("Connect"), 1, BUTTON_CONNECT);
+    wz_create_button(gui, 0, 0, fsize*7, fsize*1.5, al_ustr_new("Seek game"), 1, BUTTON_SEEK);
+    wz_create_button(gui, 0, 0, fsize*7, fsize*1.5, al_ustr_new("Flip board"), 1, BUTTON_FLIP);
+    wz_create_button(gui, 0, 0, fsize*7, fsize*1.5, al_ustr_new("Cancel"), 1, BUTTON_CANCEL);
+    return gui;
+}
+
 
 WZ_WIDGET* create_term_gui(Board *b, Terminal *term, int id){
     int fh = al_get_font_line_height(b->font);
@@ -280,13 +314,10 @@ void remove_gui(Board *b){
 
 //xxx todo: add struct for settings
 void settings_apply(Board *b, Game *g, ALLEGRO_EVENT *ev, ALLEGRO_EVENT_QUEUE *queue){
-    al_free(b->server);
-    b->server = al_cstr_dup(b->s_server);
+    al_ustr_assign(b->server, b->s_server);
     b->port = atoi(al_cstr(b->s_port));
-    al_free(b->channel);
-    b->channel = al_cstr_dup(b->s_channel);
-    al_free(b->nick);
-    b->nick = al_cstr_dup(b->s_nick);
+    al_ustr_assign(b->channel, b->s_channel);
+    al_ustr_assign(b->nick, b->s_nick);
 
     if(al_ustr_has_prefix_cstr(b->s_color, "White"))
     {
@@ -298,6 +329,32 @@ void settings_apply(Board *b, Game *g, ALLEGRO_EVENT *ev, ALLEGRO_EVENT_QUEUE *q
         b->request_player = 0;
     
     remove_gui(b);
+}
+
+void seek_game(Game *g, Board *b)
+{
+    char foo[10];
+    //    destroy_game(g);
+    //    init_game(g);
+    if(b->connected < 1)
+        return;
+    sprintf(foo, "seek %1d", b->request_player);
+    irc_cmd_msg(g_irc_s, al_cstr(b->channel), foo);
+    b->game_state = GAME_SEEKING;
+}
+
+void flip_board(Board *b){
+    ALLEGRO_BITMAP *target = al_get_target_bitmap();
+    ALLEGRO_USTR *tmp;
+    b->pov = 3-b->pov;
+    al_set_target_bitmap(b->board_bmp);
+    al_clear_to_color(NULL_COLOR);
+    draw_board(b);
+    
+    tmp=al_ustr_dup(b->s_player1_name);
+    al_ustr_assign(b->s_player1_name, b->s_player2_name);
+    al_ustr_assign(b->s_player2_name, tmp);
+    al_set_target_bitmap(target);
 }
 
 void gui_handler(Board *b, Game *g, ALLEGRO_EVENT *ev, ALLEGRO_EVENT_QUEUE *queue){
@@ -317,7 +374,12 @@ void gui_handler(Board *b, Game *g, ALLEGRO_EVENT *ev, ALLEGRO_EVENT_QUEUE *queu
                         remove_gui(b);
                         break;
                     case BUTTON_COLOR:
-                        //switch color option
+                        if(al_ustr_has_prefix_cstr(b->s_color, "White"))
+                            al_ustr_assign_cstr(b->s_color, "Black");
+                        else if(al_ustr_has_prefix_cstr(b->s_color, "Black"))
+                            al_ustr_assign_cstr(b->s_color, "Any");
+                        else if(al_ustr_has_prefix_cstr(b->s_color, "Any"))
+                            al_ustr_assign_cstr(b->s_color, "White");
                         break;
                 }
             }
@@ -333,6 +395,21 @@ void gui_handler(Board *b, Game *g, ALLEGRO_EVENT *ev, ALLEGRO_EVENT_QUEUE *queu
                     case BUTTON_CHAT:
                         add_gui(b, event_queue, create_term_gui(b, b->chat_term, GUI_CHAT));
                         break;
+                    case BUTTON_IRC_STATUS:
+                        if(b->connected)
+                        {
+                            irc_disconnect(g_irc_s);
+                            b->connected = 0;
+                            emit_event(EVENT_IRC_DISCONNECT);
+                        }
+                        else
+                        {
+                            try_irc_connect(b);
+                        }
+                        break;
+                    case BUTTON_ACTION:
+                        add_gui(b, event_queue, create_action_gui(b));
+                        break;
                 }
             }
             break;
@@ -341,11 +418,32 @@ void gui_handler(Board *b, Game *g, ALLEGRO_EVENT *ev, ALLEGRO_EVENT_QUEUE *queu
         {
             if(ev->type == WZ_TEXT_CHANGED){
              // xxx todo: check that satus is playing on irc and opponent exists!
-                send_privmsg(b, b->opponent, (char *) al_cstr(((WZ_EDITBOX*)wgt)->text));
+                send_privmsg(b, al_cstr(b->opponent), (char *) al_cstr(((WZ_EDITBOX*)wgt)->text));
                 wz_set_text(wgt, USTR_NULL);
             }
             break;
         }
+        case GUI_ACTION:
+            if(ev->type == WZ_BUTTON_PRESSED){
+                switch(ev->user.data1){
+                    case BUTTON_SEEK:
+                        seek_game(g, b);
+                        remove_gui(b);
+                        break;
+                    case BUTTON_FLIP:
+                        flip_board(b);
+                        remove_gui(b);
+                        break;
+                    case BUTTON_CONNECT:
+                        if(b->connected == 0)
+                            try_irc_connect(b);
+                        remove_gui(b);
+                        break;
+                    case BUTTON_CANCEL:
+                        remove_gui(b);
+                        break;
+                }
+            }
     }
 }
 
@@ -356,7 +454,7 @@ void create_board(Board *b){
     int size;
     b->xsize = al_get_bitmap_width(al_get_target_bitmap());
     b->ysize = al_get_bitmap_height(al_get_target_bitmap());
-    size = min(b->xsize, b->ysize);
+    size = min(b->xsize*(1.0-MIN_PANEL_PORTION), b->ysize);
     b->tsize = size/20;
     b->size = b->tsize*20;
     b->x=0;
@@ -372,6 +470,7 @@ void create_board(Board *b){
     b->board_input = 1;
     create_info_gui(b);
 }
+
 
 
 void destroy_board(Board *b){
@@ -601,11 +700,19 @@ void process_irc_event(Game *g, Board *b, int type, ALLEGRO_USER_EVENT *ev)
             
             if(b->game_state == GAME_PLAYING_IRC)
             {
-                b->opponent = strdup(origin);
+                al_ustr_assign_cstr(b->opponent, origin);
+                if(b->player == 1){
+                    al_ustr_assign(b->s_player1_name, b->nick);
+                    al_ustr_assign(b->s_player2_name, b->opponent);
+                } else {
+                    al_ustr_assign(b->s_player1_name, b->opponent);
+                    al_ustr_assign(b->s_player2_name, b->nick);
+                }
+                
                 b->pov = b->player;
                 b->game_state = GAME_PLAYING_IRC;
                 b->allow_move = (b->player == 1) ? 1 : 0;
-                send_privmsg(b, b->opponent, (b->player == 1) ? ":P1" : ":P2"); // tell: i am player 2
+                send_privmsg(b, al_cstr(b->opponent), (b->player == 1) ? ":P1" : ":P2"); // tell: i am player 2
                 emit_event(EVENT_RESTART);
             }
             
@@ -617,18 +724,18 @@ void process_irc_event(Game *g, Board *b, int type, ALLEGRO_USER_EVENT *ev)
         }
         else if((b->game_state == GAME_PLAYING_IRC) && (g->turn != b->player)) // turn=2 instead?
         {
-            if(!strcmp(origin, b->opponent))
+            if(!strcmp(origin, al_cstr(b->opponent)))
             {
                 char op_move_str[5];
                 int op_moves;
                 if(sscanf(msg, ":%d,%4s", &op_moves, op_move_str) == 2) // move was made
                 {
                     if(op_moves!= g->moves + 1){
-                        send_privmsg(b, b->opponent, "SYNC problem. This is not the move I'm waiting.");
+                        send_privmsg(b, al_cstr(b->opponent), "SYNC problem. This is not the move I'm waiting.");
                     }
                     else if(!str_is_move(op_move_str))
                     {
-                        send_privmsg(b, b->opponent, "Invalid move. Send again.");
+                        send_privmsg(b, al_cstr(b->opponent), "Invalid move. Send again.");
                     }
                     else
                     {
@@ -637,13 +744,13 @@ void process_irc_event(Game *g, Board *b, int type, ALLEGRO_USER_EVENT *ev)
                         
                         if(is_block_movable(g, i, j) && try_lock(g, b, i, j) && try_move(g, b,  ii, jj))
                         {
-                            acknowledge_privmsg(b, b->opponent, msg);
+                            acknowledge_privmsg(b, al_cstr(b->opponent), msg);
                             b->allow_move = 1;
                         }
                         else
                         {
                             unlock_block(g, b);
-                            send_privmsg(b, b->opponent, "Invalid move. Send again.");
+                            send_privmsg(b, al_cstr(b->opponent), "Invalid move. Send again.");
                         }
                     }
                 } // else if (... other commands like undo, forefeit, adjourn, etc... )
@@ -672,6 +779,7 @@ void process_irc_event(Game *g, Board *b, int type, ALLEGRO_USER_EVENT *ev)
     free(origin);
     free(msg);
 }
+
 
 int main(int argc, char **argv){
     ALLEGRO_EVENT ev;
@@ -742,6 +850,24 @@ int main(int argc, char **argv){
 
     init_board(&b);
 
+    event_queue = al_create_event_queue();
+    if(!event_queue) {
+        fprintf(stderr, "failed to create event_queue!\n");
+        al_destroy_display(display);
+        return -1;
+    }
+    
+    
+    al_register_event_source(event_queue, al_get_display_event_source(display));
+    if(al_is_keyboard_installed())
+        al_register_event_source(event_queue, al_get_keyboard_event_source());
+    if(al_is_mouse_installed())
+        al_register_event_source(event_queue, al_get_mouse_event_source());
+    if(al_is_touch_input_installed())
+        al_register_event_source(event_queue, al_get_touch_input_event_source());
+    
+    al_register_event_source(event_queue , &user_event_src);
+
 RESTART:
     init_game(&g);
     create_board(&b);
@@ -758,23 +884,6 @@ RESTART:
 
     
     /// need to move this before restart!!!
-    event_queue = al_create_event_queue();
-    if(!event_queue) {
-        fprintf(stderr, "failed to create event_queue!\n");
-        al_destroy_display(display);
-        return -1;
-    }
-
-
-    al_register_event_source(event_queue, al_get_display_event_source(display));
-    if(al_is_keyboard_installed())
-        al_register_event_source(event_queue, al_get_keyboard_event_source());
-    if(al_is_mouse_installed())
-        al_register_event_source(event_queue, al_get_mouse_event_source());
-    if(al_is_touch_input_installed())
-        al_register_event_source(event_queue, al_get_touch_input_event_source());
-
-    al_register_event_source(event_queue , &user_event_src);
 
     al_set_target_backbuffer(display);
 
@@ -847,30 +956,7 @@ RESTART:
                     gui_handler(&b, &g, &ev, event_queue);
                     redraw=1;
                     break;
-//                    
-//                case WZ_BUTTON_PRESSED:
-//                    switch ((int)ev.user.data1)
-//                    {
-//                        case BUTTON_SETTINGS:
-//                            add_gui(&b, event_queue, create_settings_gui(&b));
-//                            redraw=1;
-//                            break;
-//                        case BUTTON_CHAT:
-//                            add_gui(&b, event_queue, create_term_gui(&b, b.chat_term, GUI_CHAT));
-//                            redraw=1;
-//                            break;
-//                    }
-//                case WZ_TEXT_CHANGED:
-//                {
-//                    WZ_WIDGET *wgt = (WZ_WIDGET*) ev.user.data2;
-//                    if(wgt->parent && wgt->parent->id == GUI_CHAT)
-//                    { // xxx todo: check that satus is playing on irc and opponent exists!
-//                        send_privmsg(&b, b.opponent, (char *) al_cstr(((WZ_EDITBOX*)wgt)->text));
-//                     //   term_add_line(b.chat_term, (char *) al_cstr(((WZ_EDITBOX*)wgt)->text));
-//                        wz_set_text(wgt, USTR_NULL);
-//                    }
-//                    redraw=1;
-//                }
+                    
                 case EVENT_IRC_JOIN:
                     break;
                     
@@ -904,6 +990,7 @@ RESTART:
                     al_ustr_assign_cstr(b.irc_status_msg, "Connected");
                     redraw=1;
                     break;
+                    
                 case ALLEGRO_EVENT_KEY_CHAR:
                     keypress=1;
                     
@@ -957,21 +1044,12 @@ RESTART:
                                 break;
                                 
                             case ALLEGRO_KEY_1:
-                                IRC_connect(b.server, b.port, b.nick, b.channel);
-                                al_ustr_assign_cstr(b.irc_status_msg, "Connecting...");
-                                redraw=1;
+                                try_irc_connect(&b);
                                 break;
                             
                             case ALLEGRO_KEY_2:
-                            {
-                                char foo[10];
-                                destroy_game(&g);
-                                init_game(&g);
-                                sprintf(foo, "seek %1d", b.request_player);
-                                irc_cmd_msg(g_irc_s, b.channel, foo);
-                                b.game_state = GAME_SEEKING;
+                                seek_game(&g, &b);
                                 break;
-                            }
                                 
                             default:
                                 if((ev.keyboard.unichar>= 'a') && (ev.keyboard.unichar <= 't')){

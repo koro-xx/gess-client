@@ -35,6 +35,7 @@
 #define EVENT_IRC_JOIN (BASE_USER_EVENT_TYPE + 9)
 #define EVENT_PRIVMSG_RECEIVED (BASE_USER_EVENT_TYPE + 10)
 #define EVENT_CHANMSG_RECEIVED (BASE_USER_EVENT_TYPE + 11)
+#define EVENT_IRC_DISCONNECT (BASE_USER_EVENT_TYPE + 12)
 
 
 #define BF_CODEPOINT_START 0x0860
@@ -43,6 +44,7 @@
 #define in_board(i,j) (((i>=0) && (i<20) && (j>=0) && (j<20)) ? 1 : 0)
 #define set_brd(t, i, j, k) do{ if(in_board(i,j)) t[i][j] = k; }while(0)
 
+#define MIN_PANEL_PORTION 0.2
 // types
 
 enum { // gui elements
@@ -50,11 +52,17 @@ enum { // gui elements
     GUI_INFO,
     GUI_SETTINGS,
     GUI_CHAT,
+    GUI_ACTION,
     BUTTON_OK,
     BUTTON_CANCEL,
     BUTTON_COLOR,
     BUTTON_SETTINGS,
     BUTTON_CHAT,
+    BUTTON_IRC_STATUS,
+    BUTTON_ACTION,
+    BUTTON_SEEK,
+    BUTTON_FLIP,
+    BUTTON_CONNECT
 };
 
 enum { // status 
@@ -116,12 +124,12 @@ typedef struct Board {
     ALLEGRO_FONT *font; // fixed with please!
     
     // irc stuff
-    char *opponent;
+    ALLEGRO_USTR *opponent;
     int game_state;
-    char *server;
-    char *channel;
+    ALLEGRO_USTR *server;
+    ALLEGRO_USTR *channel;
     int port;
-    char *nick;
+    ALLEGRO_USTR *nick;
     int game_type;
     int player; // on irc who is the player
     int connected;
@@ -137,12 +145,17 @@ typedef struct Board {
     void *guiel[5];
     int gui_n;
     
+    // info gui helper
+    ALLEGRO_USTR *s_player1_name;
+    ALLEGRO_USTR *s_player2_name;
+    
     // settings gui helper (move all settings to a signle struct later!)
     ALLEGRO_USTR *s_server;
     ALLEGRO_USTR *s_port;
     ALLEGRO_USTR *s_channel;
     ALLEGRO_USTR *s_nick;
     ALLEGRO_USTR *s_color;
+    
 } Board;
 
 
