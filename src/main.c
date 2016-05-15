@@ -127,6 +127,8 @@ void init_board(Board *b){
     b->allow_move = 1;
     b->chat_term = term_create(80, 24);
     b->opponent = NULL;
+    b->irc_status_msg = al_ustr_new("Disconnected");
+    b->request_player = 0;
    // b->game_type = ?
 }
 
@@ -158,7 +160,9 @@ void create_info_gui(Board *b){
     wz_create_fill_layout(gui, 0, gui_h/3, gui_w, gui_h/3, fsize/2, fsize/3, WZ_ALIGN_CENTRE, WZ_ALIGN_TOP, -1);
     wz_create_textbox(gui, 0, 0, gui_w-fsize, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, al_ustr_newf("%s:%d", b->server, b->port), 1, -1);
     wz_create_textbox(gui, 0, 0, gui_w-fsize, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, al_ustr_newf("Nickname: %s", b->nick), 1, -1);
-    wz_create_textbox(gui, 0, 0, gui_w-fsize, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, al_ustr_newf("%s", b->connected ? "Connected" : "Disconnected"), 1, -1);
+    //wz_create_textbox(gui, 0, 0, gui_w-fsize, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, al_ustr_newf("%s", b->connected ? "Connected" : "Disconnected"), 1, -1);
+    wz_create_textbox(gui, 0, 0, gui_w-fsize, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, b->irc_status_msg, 0, -1);
+
     wz_create_box(gui, 0, 0, gui_w-fsize, fsize, -1); //xxx must hide box
     wz_create_button(gui, 0, 0, fsize*5, fsize*1.5, al_ustr_new("Settings"), 1, BUTTON_SETTINGS);
     wz_create_button(gui, 0, 0, fsize*5, fsize*1.5, al_ustr_new("Chat"), 1, BUTTON_CHAT);
@@ -256,7 +260,6 @@ void create_board(Board *b){
     al_set_target_bitmap(target);
     b->gui_n = 0;
     b->gui[0] = NULL;
-    b->term_show = 0;
     b->board_input = 1;
     create_info_gui(b);
 }
@@ -473,42 +476,30 @@ void process_irc_event(Game *g, Board *b, int type, ALLEGRO_USER_EVENT *ev)
         {
             if(!strcasecmp(msg, ":ACK seek"))
             {
-                b->opponent = strdup(origin);
-                if(rand() % 2){ // decide who starts
-                    b->player = 2;
-                    b->pov = 2;
-                    send_privmsg(b, b->opponent, ":P2"); // tell: i am player 2
-                    b->game_state = GAME_PLAYING_IRC;
-                    b->allow_move = 0;
-                    emit_event(EVENT_RESTART);
-                } else {
-                    b->player = 1;
-                    b->pov = 1;
-                    send_privmsg(b, b->opponent, ":P1"); // tell: i am player 1
-                    b->game_state = GAME_PLAYING_IRC;
-                    b->allow_move = 1;
-                    emit_event(EVENT_RESTART);
-
-                }
+                b->game_state = GAME_PLAYING_IRC;
+                b->player =  b->request_player ? b->request_player : ((rand()%2)+1);
             }
             else if (!strcasecmp(msg, ":P1"))
             {
-                b->opponent = strdup(origin);
                 b->game_state = GAME_PLAYING_IRC;
-                b->pov = 2;
                 b->player = 2;
-                b->allow_move = 0;
-                emit_event(EVENT_RESTART);
             }
             else if(!strcasecmp(msg, ":P2"))
             {
-                b->opponent = strdup(origin);
                 b->game_state = GAME_PLAYING_IRC;
-                b->pov = 1;
                 b->player = 1;
-                b->allow_move = 1;
+            }
+            
+            if(b->game_state == GAME_PLAYING_IRC)
+            {
+                b->opponent = strdup(origin);
+                b->pov = b->player;
+                b->game_state = GAME_PLAYING_IRC;
+                b->allow_move = (b->player == 1) ? 1 : 0;
+                send_privmsg(b, b->opponent, (b->player == 1) ? ":P1" : ":P2"); // tell: i am player 2
                 emit_event(EVENT_RESTART);
             }
+            
 // xxx todo: log chat message into chat console.
 //            else
 //            {
@@ -548,7 +539,7 @@ void process_irc_event(Game *g, Board *b, int type, ALLEGRO_USER_EVENT *ev)
                     }
                 } // else if (... other commands like undo, forefeit, adjourn, etc... )
             }
-        }
+        }// xxx todo: remove this:
         else if(b->game_state == GAME_WAITING_MOVE_ACK)
         {
             if((strstr(msg, ":ACK ,") == msg) && (!strcmp(msg+6,g->brd->last_move)))
@@ -561,7 +552,7 @@ void process_irc_event(Game *g, Board *b, int type, ALLEGRO_USER_EVENT *ev)
     {
         if(b->game_state == GAME_SEEKING)
         {
-            if(!strcasecmp(msg, "seek"))
+            if(strncmp(msg, ":seek", 5)>0)
             {
                 send_privmsg(b, origin, ":ACK seek");
             }
@@ -802,6 +793,8 @@ RESTART:
                 case EVENT_IRC_CONNECT:
                     printf("MAIN THREAD: irc conencted.\n");
                     b.connected = 1;
+                    al_ustr_assign_cstr(b.irc_status_msg, "Connected");
+                    redraw=1;
                     break;
                 case ALLEGRO_EVENT_KEY_CHAR:
                     keypress=1;
@@ -857,14 +850,20 @@ RESTART:
                                 
                             case ALLEGRO_KEY_1:
                                 IRC_connect(b.server, b.port, b.nick, b.channel);
+                                al_ustr_assign_cstr(b.irc_status_msg, "Connecting...");
+                                redraw=1;
                                 break;
                             
                             case ALLEGRO_KEY_2:
+                            {
+                                char foo[10];
                                 destroy_game(&g);
                                 init_game(&g);
-                                irc_cmd_msg(g_irc_s, b.channel, "seek");
+                                sprintf(foo, "seek %1d", b.request_player);
+                                irc_cmd_msg(g_irc_s, b.channel, foo);
                                 b.game_state = GAME_SEEKING;
                                 break;
+                            }
                                 
                             default:
                                 if((ev.keyboard.unichar>= 'a') && (ev.keyboard.unichar <= 't')){

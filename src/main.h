@@ -124,9 +124,9 @@ typedef struct Board {
     int game_type;
     int player; // on irc who is the player
     int connected;
+    int request_player;
     Terminal *chat_term;
-    int term_show;
-    
+    ALLEGRO_USTR *irc_status_msg;
     // guis | todo: make one big gui (whole screen) and destroy/create other guis as widgets
     WZ_WIDGET* i_gui;
     WZ_WIDGET* settings_gui;
