@@ -62,7 +62,8 @@ enum { // gui elements
     BUTTON_ACTION,
     BUTTON_SEEK,
     BUTTON_FLIP,
-    BUTTON_CONNECT
+    BUTTON_CONNECT,
+    BUTTON_UNDO
 };
 
 enum { // status 
@@ -156,6 +157,8 @@ typedef struct Board {
     ALLEGRO_USTR *s_nick;
     ALLEGRO_USTR *s_color;
     
+    ALLEGRO_BITMAP *bmp_turn1;
+    ALLEGRO_BITMAP *bmp_turn2;
 } Board;
 
 

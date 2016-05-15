@@ -142,11 +142,14 @@ void init_board(Board *b){
     b->s_player1_name = al_ustr_new("Player 1");
     b->s_player2_name = al_ustr_new("Player 2");
     
+    b->bmp_turn1=NULL;
+    b->bmp_turn2=NULL;
+    
    // b->game_type = ?
 }
 
 
-void create_info_gui(Board *b){
+void create_info_gui(Board *b, Game *g){
     //xxx assume that screen is wider than taller for now
     int gui_w = b->xsize - b->x - b->size;
     int gui_h = b->size;
@@ -167,27 +170,31 @@ void create_info_gui(Board *b){
     
     gui = wz_create_widget(0, b->x + b->size, b->y, GUI_INFO);
     wz_set_theme(gui, (WZ_THEME*)&theme);
-    wz_create_fill_layout(gui, 0, 0, gui_w, gui_h/3, fsize/2, fsize/3, WZ_ALIGN_LEFT, WZ_ALIGN_TOP, -1);
-    wz_create_textbox(gui, 0, 0, gui_w-fsize, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, b->s_player2_name,0, -1);
-    wz_create_fill_layout(gui, 0, gui_h/3, gui_w, gui_h/3, fsize/2, fsize/3, WZ_ALIGN_LEFT, WZ_ALIGN_TOP, -1);
-  
-    wz_create_button(gui, 0, 0, fsize*10, fsize*1.5, b->irc_status_msg, 0, BUTTON_IRC_STATUS);
     
-//    wz_create_textbox(gui, 0, 0, gui_w-fsize, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, b->irc_status_msg, 0, -1);
+    wz_create_fill_layout(gui, 0, 0, gui_w, gui_h/3, fsize/2, fsize/3, WZ_ALIGN_LEFT, WZ_ALIGN_TOP, -1);
+    
+    redraw_turn_buttons(b, gui_w, fsize);
+
+    wz_create_image_button(gui, 0, 0, gui_w, fsize, b->bmp_turn2, b->bmp_turn2, b->bmp_turn2, b->bmp_turn2, -1);
+    wz_create_textbox(gui, 0, 0, gui_w-fsize, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, b->s_player2_name,0, -1);
+
+    wz_create_fill_layout(gui, 0, gui_h/3, gui_w, gui_h/3, fsize/2, fsize/3, WZ_ALIGN_LEFT, WZ_ALIGN_TOP, -1);
     wz_create_textbox(gui, 0, 0, gui_w-fsize, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, b->server, 0, -1);
     wz_create_textbox(gui, 0, 0, al_get_text_width(b->font, "Nick:"), fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, al_ustr_new("Nick:"), 1, -1);
     wz_create_textbox(gui, 0, 0, gui_w-al_get_text_width(b->font, "Nick:")-fsize, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, b->nick, 0, -1);
+    wz_create_button(gui, 0, 0, fsize*8, fsize*1.5, b->irc_status_msg, 0, BUTTON_IRC_STATUS);
+//    wz_create_box(gui, 0, 0, gui_w, fsize, -1); //xxx must hide box
+    wz_create_button(gui, 0, 0, fsize*8, fsize*1.5, al_ustr_new("Action"), 1, BUTTON_ACTION);
+    wz_create_button(gui, 0, 0, fsize*8, fsize*1.5, al_ustr_new("Chat"), 1, BUTTON_CHAT);
+    wz_create_button(gui, 0, 0, fsize*8, fsize*1.5, al_ustr_new("Settings"), 1, BUTTON_SETTINGS);
+    wz_create_button(gui, 0, 0, fsize*8, fsize*1.5, al_ustr_new("Undo"), 1, BUTTON_UNDO);
 
+    wz_create_fill_layout(gui, 0, 2*gui_h/3, gui_w, gui_h/3, fsize/2, fsize/3, WZ_ALIGN_CENTRE, WZ_ALIGN_BOTTOM, -1);
     
-    wz_create_box(gui, 0, 0, gui_w, fsize, -1); //xxx must hide box
-    wz_create_button(gui, 0, 0, fsize*5, fsize*1.5, al_ustr_new("Settings"), 1, BUTTON_SETTINGS);
-    wz_create_button(gui, 0, 0, fsize*5, fsize*1.5, al_ustr_new("Chat"), 1, BUTTON_CHAT);
-    wz_create_button(gui, 0, 0, fsize*5, fsize*1.5, al_ustr_new("Action"), 1, BUTTON_ACTION);
-    
-    wz_create_fill_layout(gui, 0, 2*gui_h/3, gui_w, gui_h/3, fsize/2, fsize/3, WZ_ALIGN_CENTRE, WZ_ALIGN_TOP, -1);
+    wz_create_image_button(gui, 0, 0, gui_w, fsize, b->bmp_turn1, b->bmp_turn1, b->bmp_turn1, b->bmp_turn1, -1);
     wz_create_textbox(gui, 0, 0, gui_w-fsize, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, b->s_player1_name,0, -1);
-    
     b->i_gui = gui;
+    if(g->turn == 2) swap_bitmaps(b->bmp_turn1, b->bmp_turn2);
 }
 
 WZ_WIDGET* create_settings_gui(Board *b){
@@ -357,6 +364,19 @@ void flip_board(Board *b){
     al_set_target_bitmap(target);
 }
 
+
+void execute_undo(Game *g, Board *b){
+    if(b->game_state != GAME_PLAYING) return;
+    if(!g->brd->parent) return;
+    g->brd = g->brd->parent;
+    free(g->brd->child);
+    b->lock = 0;
+    g->moves--;
+    g->turn = (g->turn == 1) ? 2 : 1;
+    swap_bitmaps(b->bmp_turn1, b->bmp_turn2);
+
+}
+
 void gui_handler(Board *b, Game *g, ALLEGRO_EVENT *ev, ALLEGRO_EVENT_QUEUE *queue){
     WZ_WIDGET* wgt = (WZ_WIDGET *)ev->user.data2;
     if(!wgt->parent) return; // just in case
@@ -410,6 +430,9 @@ void gui_handler(Board *b, Game *g, ALLEGRO_EVENT *ev, ALLEGRO_EVENT_QUEUE *queu
                     case BUTTON_ACTION:
                         add_gui(b, event_queue, create_action_gui(b));
                         break;
+                    case BUTTON_UNDO:
+                        execute_undo(g, b);
+                        break;
                 }
             }
             break;
@@ -424,6 +447,7 @@ void gui_handler(Board *b, Game *g, ALLEGRO_EVENT *ev, ALLEGRO_EVENT_QUEUE *queu
             break;
         }
         case GUI_ACTION:
+        {
             if(ev->type == WZ_BUTTON_PRESSED){
                 switch(ev->user.data1){
                     case BUTTON_SEEK:
@@ -444,12 +468,14 @@ void gui_handler(Board *b, Game *g, ALLEGRO_EVENT *ev, ALLEGRO_EVENT_QUEUE *queu
                         break;
                 }
             }
+            break;
+        }
     }
 }
 
 
 
-void create_board(Board *b){
+void create_board(Board *b, Game *g){
     ALLEGRO_BITMAP *target = al_get_target_bitmap();
     int size;
     b->xsize = al_get_bitmap_width(al_get_target_bitmap());
@@ -468,7 +494,7 @@ void create_board(Board *b){
     b->gui_n = 0;
     b->gui[0] = NULL;
     b->board_input = 1;
-    create_info_gui(b);
+    create_info_gui(b, g);
 }
 
 
@@ -493,17 +519,8 @@ void destroy_board(Board *b){
     
     // xxx todo: draw rectangle at last move source & dest
     // create draw functions for stones and board rectangles
-    
 
 
-void execute_undo(Game *g, Board *b){
-    if(!g->brd->parent) return;
-    g->brd = g->brd->parent;
-    free(g->brd->child);
-    b->lock = 0;
-    g->moves--;
-    g->turn = (g->turn == 1) ? 2 : 1;
-}
 
 
 void get_tile(Board *b, int *tx, int *ty, int x, int y){
@@ -634,6 +651,7 @@ int try_move(Game *g, Board *b, int i, int j){
         drop_block(g->brd->parent, b->lock_i, b->lock_j, &b->lock_blk);
         b->draw_last = 1; //xxx todo: if set->draw_last
         ret = 1;
+        swap_bitmaps(b->bmp_turn1, b->bmp_turn2);
     } // else no move was made
     
     drop_block(g->brd, i, j, &b->lock_blk);
@@ -870,7 +888,7 @@ int main(int argc, char **argv){
 
 RESTART:
     init_game(&g);
-    create_board(&b);
+    create_board(&b, &g);
     
 //    if(!MOBILE && !fullscreen) {
 //        al_set_target_backbuffer(display);
@@ -1014,10 +1032,8 @@ RESTART:
     //                            break;
                                 
                             case ALLEGRO_KEY_BACKSPACE:
-                                if(b.game_state == GAME_PLAYING){ // not on irc
-                                    execute_undo(&g, &b);
-                                    redraw=1;
-                                } // otherwise we could request undo
+                                execute_undo(&g, &b);
+                                redraw=1;
                                 break;
                             case ALLEGRO_KEY_SPACE:
                                 //params_gui(&g, &b, event_queue);
@@ -1092,7 +1108,7 @@ RESTART:
             al_set_target_backbuffer(display);
 			al_acknowledge_resize(display);
             destroy_board(&b); // fix this
-            create_board(&b);
+            create_board(&b, &g);
             add_gui(&b, event_queue, b.i_gui);
 //            wz_register_sources(b.i_gui, event_queue);
 

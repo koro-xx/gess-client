@@ -29,6 +29,19 @@ int init_fonts(void){
     return 0;
 }
 
+// swaps bitmaps of equal size
+void swap_bitmaps(ALLEGRO_BITMAP *b1, ALLEGRO_BITMAP *b2){
+    ALLEGRO_BITMAP *target = al_get_target_bitmap();
+    ALLEGRO_BITMAP *foo = al_clone_bitmap(b2);
+    al_set_target_bitmap(b2);
+    al_clear_to_color(NULL_COLOR);
+    al_draw_bitmap(b1, 0, 0, 0);
+    al_set_target_bitmap(b1);
+    al_clear_to_color(NULL_COLOR);
+    al_draw_bitmap(foo,0,0,0);
+    al_set_target_bitmap(target);
+}
+
 ALLEGRO_FONT *load_font_mem(MemFile font_mem, const char *filename, int size){
     // filename is only to detect extension
     ALLEGRO_FILE *fp = NULL;

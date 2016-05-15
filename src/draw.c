@@ -10,8 +10,26 @@
 #define FOCUS_NOMOVE_COLOR al_premul_rgba(255, 255, 255, 30)
 #define FOCUS_CENTER_COLOR al_premul_rgba(255, 255, 255, 60)
 #define ARROW_COLOR al_map_rgba(150, 150, 0, 150)
+#define TURN_COLOR al_map_rgba(200, 200, 0, 255)
 
 ALLEGRO_COLOR MOVE_COLOR[4] = {{0,0,0,0}, {0.2,0.2,0,0.2}, {0.2,0,0,0.2}, {0.2,0,0,0.2}};
+
+
+void redraw_turn_buttons(Board *b, int w, int h){
+    ALLEGRO_BITMAP *target =al_get_target_bitmap();
+    ndestroy_bitmap(b->bmp_turn1);
+    ndestroy_bitmap(b->bmp_turn2);
+    b->bmp_turn1=al_create_bitmap(w,h);
+    al_set_target_bitmap(b->bmp_turn1);
+    al_clear_to_color(TURN_COLOR);
+
+    b->bmp_turn2=al_create_bitmap(w,h);
+    al_set_target_bitmap(b->bmp_turn2);
+    al_clear_to_color(NULL_COLOR);
+
+    al_set_target_bitmap(target);
+    
+}
 
 void draw_tile_rectangle(Board *b, int i, int j, int w, int h, ALLEGRO_COLOR color, int stroke){
     if(b->pov == 2){

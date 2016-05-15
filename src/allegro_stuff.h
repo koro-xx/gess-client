@@ -28,6 +28,7 @@ typedef struct MemFile{
 
 // Prototypes
 
+
 // Init mouse, kbd, addons, set path to resources path (or cwd), etc
 int init_allegro(void);
 
@@ -52,6 +53,8 @@ ALLEGRO_BITMAP *screenshot();
 ALLEGRO_BITMAP *screenshot_part(int x, int y, int w, int h);
 ALLEGRO_BITMAP *scaled_clone_bitmap(ALLEGRO_BITMAP *source, int w, int h);
 
+// swaps bitmaps of equal size
+void swap_bitmaps(ALLEGRO_BITMAP *b1, ALLEGRO_BITMAP *b2);
 
     
 // variables

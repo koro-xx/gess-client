@@ -6,5 +6,6 @@
 
 void draw_stuff(Game *g, Board *b);
 void draw_board(Board *b);
+void redraw_turn_buttons(Board *b, int w, int h);
 
 #endif /* defined(__gess__draw__) */
