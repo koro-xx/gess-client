@@ -11,7 +11,8 @@
 
 #define PI 3.1415926558
 
-#define SWITCH(x) ( (x = (x) ? (0):(1)) )
+#define sign(x) (((x) == 0) ? 0 : (((x) > 0) ? 1 : -1))
+#define SWITCH(x) ( ((x) = ((x) ? (0):(1))) )
 #undef min 
 #undef max
 #define min(x,y) ((x)<(y)?(x):(y))

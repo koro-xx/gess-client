@@ -17,7 +17,8 @@
 #define BLACK_COLOR (al_map_rgb(0,0,0))
 #define LBLUE_COLOR (al_map_rgb(0, 120, 250))
 #define al_rewind(x) al_fseek(x,0,ALLEGRO_SEEK_SET)
-
+// make color transparent by factor f (between 0 and 1)
+#define color_trans(c, f) ((ALLEGRO_COLOR){(c.r)*(f), (c.g)*(f), (c.b)*(f), (c.a)*(f)})
 
 typedef struct MemFile{
     void *mem;
