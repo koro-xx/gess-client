@@ -57,7 +57,7 @@ ALLEGRO_BITMAP *scaled_clone_bitmap(ALLEGRO_BITMAP *source, int w, int h);
 // variables
 extern MemFile text_font_mem;
 extern const char *TEXT_FONT_FILE;
-extern const ALLEGRO_USTR *USTR_NULL;
+extern ALLEGRO_USTR *USTR_NULL;
 
 
 

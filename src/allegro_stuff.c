@@ -10,7 +10,7 @@
 
 MemFile text_font_mem={0};;
 const char *TEXT_FONT_FILE = "fonts/DroidSansMono.ttf"; //`"fonts/text_font.ttf";
-const ALLEGRO_USTR *USTR_NULL;
+ALLEGRO_USTR *USTR_NULL;
 
 struct Buffer_USTR{
     ALLEGRO_USTR *ustr;

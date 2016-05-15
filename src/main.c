@@ -69,9 +69,9 @@ void chat_term_add_line(Terminal *t, char *origin, char *msg){
 }
 
 void send_privmsg(Board *b, char *nick, char *msg){
-    irc_cmd_msg(g_irc_s, nick, msg);
+    if(nick) irc_cmd_msg(g_irc_s, nick, msg);
     deblog("SENT: %s | %s", nick, msg);
-    chat_term_add_line(b->chat_term, nick, msg);
+    chat_term_add_line(b->chat_term, b->nick, msg);
 }
 
 void acknowledge_privmsg(Board *b, char *nick, char *msg){
@@ -81,14 +81,13 @@ void acknowledge_privmsg(Board *b, char *nick, char *msg){
 }
 
 void send_move(Game *g, Board *b){
-    char move[6];
-    move[0] = ',';
-    strcpy(move+1, g->brd->last_move);
+    char move[32];
+    snprintf(move, 32, ":%d,%s", g->moves, g->brd->last_move);
+//    strcpy(move+1, g->brd->last_move);
     send_privmsg(b, b->opponent, move);
-    b->game_state = GAME_WAITING_MOVE_ACK;
-    b->allow_move = 1;
+//    b->game_state = GAME_WAITING_MOVE_ACK;
+    b->allow_move = 0;
 }
-
 
 void emit_data_event(int event, intptr_t d1, intptr_t d2, intptr_t d3, intptr_t d4){
     static ALLEGRO_EVENT user_event = {0};
@@ -127,6 +126,7 @@ void init_board(Board *b){
     b->connected = 0;
     b->allow_move = 1;
     b->chat_term = term_create(80, 24);
+    b->opponent = NULL;
    // b->game_type = ?
 }
 
@@ -419,7 +419,7 @@ int try_move(Game *g, Board *b, int i, int j){
         g->turn = (g->turn == 1) ? 2 : 1;
         g->moves++;
         g->brd->child = NULL;
-        get_move_coords(g->brd->last_move, b->lock_i, b->lock_j, i, j);
+        coords_to_str(g->brd->last_move, b->lock_i, b->lock_j, i, j);
         drop_block(g->brd->parent, b->lock_i, b->lock_j, &b->lock_blk);
         b->draw_last = 1; //xxx todo: if set->draw_last
         ret = 1;
@@ -446,7 +446,6 @@ void enter_move(Game *g, Board *b){
         if(try_move(g, b, b->fi, b->fj))
             if(b->game_state == GAME_PLAYING_IRC){
                 send_move(g, b);
-                b->allow_move = 0;
             }
     } else {
         try_lock(g, b, b->fi, b->fj);
@@ -520,19 +519,22 @@ void process_irc_event(Game *g, Board *b, int type, ALLEGRO_USER_EVENT *ev)
         {
             if(!strcmp(origin, b->opponent))
             {
-                if(msg[0] == ',') // means move coordinates follow
+                char op_move_str[5];
+                int op_moves;
+                if(sscanf(msg, ":%d,%4s", &op_moves, op_move_str) == 2) // move was made
                 {
-                    if(!str_is_move(msg+1))
+                    if(op_moves!= g->moves + 1){
+                        send_privmsg(b, b->opponent, "SYNC problem. This is not the move I'm waiting.");
+                    }
+                    else if(!str_is_move(op_move_str))
                     {
                         send_privmsg(b, b->opponent, "Invalid move. Send again.");
                     }
                     else
                     {
-                    
-                        int i = coord_to_i(msg[1]);
-                        int j = coord_to_j(msg[2]);
-                        int ii = coord_to_i(msg[3]);
-                        int jj = coord_to_j(msg[4]);
+                        int i, j, ii, jj;
+                        str_to_coords(op_move_str, &i, &j, &ii, &jj);
+                        
                         if(is_block_movable(g, i, j) && try_lock(g, b, i, j) && try_move(g, b,  ii, jj))
                         {
                             acknowledge_privmsg(b, b->opponent, msg);
@@ -755,8 +757,9 @@ RESTART:
                 {
                     WZ_WIDGET *wgt = (WZ_WIDGET*) ev.user.data2;
                     if(wgt->parent && wgt->parent->id == GUI_CHAT)
-                    {
-                        term_add_line(b.chat_term, (char *) al_cstr(((WZ_EDITBOX*)wgt)->text));
+                    { // xxx todo: check that satus is playing on irc and opponent exists!
+                        send_privmsg(&b, b.opponent, (char *) al_cstr(((WZ_EDITBOX*)wgt)->text));
+                     //   term_add_line(b.chat_term, (char *) al_cstr(((WZ_EDITBOX*)wgt)->text));
                         wz_set_text(wgt, USTR_NULL);
                     }
                     else if (wgt->id == GUI_SERVER_TEXT)

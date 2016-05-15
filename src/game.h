@@ -10,8 +10,12 @@ char j_to_coord(int j);
 int coord_to_i(char ci);
 int coord_to_j(char cj);
 
+
+// get move coords from string
+void str_to_coords(char *str, int *i, int *j, int *ii, int *jj);
+
 // get 4-letter string of moves for a given numeric move
-void get_move_coords(char *str, int i, int j, int ii, int jj);
+void coords_to_str(char *str, int i, int j, int ii, int jj);
 
 // grab block at coordinates i,j
 void grab_block(Board_State *bs, int i, int j, Block *blk);

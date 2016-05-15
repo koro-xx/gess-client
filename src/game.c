@@ -50,7 +50,14 @@ int coord_to_j(char cj){
     return 19 - (cj-'a');
 }
 
-void get_move_coords(char *str, int i, int j, int ii, int jj){
+void str_to_coords(char *str, int *i, int *j, int *ii, int *jj){
+    *i = str[0]-'a';
+    *j = 't'-str[1];
+    *ii = str[2]-'a';
+    *jj = 't'-str[3];
+}
+
+void coords_to_str(char *str, int i, int j, int ii, int jj){
     str[0] = i_to_coord(i);
     str[1] = j_to_coord(j);
     str[2] = i_to_coord(ii);
