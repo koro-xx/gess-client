@@ -19,6 +19,21 @@ struct Buffer_USTR{
 
 struct Buffer_USTR *buffer_ustr = NULL;
 
+
+bool callback(int line_num, const char *line, int size, void *extra){
+    
+    //(* (int *) extra) ++;// = *line;
+    * (int *) extra = line_num;
+    return 1;
+}
+
+int get_multiline_text_lines(const ALLEGRO_FONT *font, float max_width, const char *text)
+{
+    int lines =0;
+    al_do_multiline_text(font, max_width, text, &callback, &lines);
+    return lines+1;
+}
+
 int init_fonts(void){
     text_font_mem = create_memfile(TEXT_FONT_FILE);
     if(!text_font_mem.mem){

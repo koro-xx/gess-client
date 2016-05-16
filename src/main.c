@@ -142,6 +142,8 @@ void init_board(Board *b){
     b->s_player1_name = al_ustr_new("Player 1");
     b->s_player2_name = al_ustr_new("Player 2");
     
+    b->gui_confirm_n = 0;
+    
     b->bmp_turn1=NULL;
     b->bmp_turn2=NULL;
     
@@ -175,9 +177,9 @@ void create_info_gui(Board *b, Game *g){
     
     redraw_turn_buttons(b, gui_w, fsize);
 
-    wz_create_image_button(gui, 0, 0, gui_w, fsize, b->bmp_turn2, b->bmp_turn2, b->bmp_turn2, b->bmp_turn2, -1);
     wz_create_textbox(gui, 0, 0, gui_w-fsize, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, b->s_player2_name,0, -1);
-
+    wz_create_image_button(gui, 0, 0, gui_w, fsize, b->bmp_turn2, b->bmp_turn2, b->bmp_turn2, b->bmp_turn2, -1);
+    
     wz_create_fill_layout(gui, 0, gui_h/3, gui_w, gui_h/3, fsize/2, fsize/3, WZ_ALIGN_LEFT, WZ_ALIGN_TOP, -1);
     wz_create_textbox(gui, 0, 0, gui_w-fsize, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, b->server, 0, -1);
     wz_create_textbox(gui, 0, 0, al_get_text_width(b->font, "Nick:"), fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, al_ustr_new("Nick:"), 1, -1);
@@ -197,13 +199,43 @@ void create_info_gui(Board *b, Game *g){
     if(g->turn == 2) swap_bitmaps(b->bmp_turn1, b->bmp_turn2);
 }
 
+WZ_WIDGET* create_confirm_gui(Board *b, int EVENT_TYPE, ALLEGRO_USTR *msg){
+    int w = b->size/3;
+    int h = get_multiline_text_lines(b->font, w, al_cstr(msg))*al_get_font_line_height(b->font);
+    int fsize = b->tsize*0.5;
+
+    WZ_WIDGET *gui, *wgt;
+    static WZ_DEF_THEME theme;
+    memset(&theme, 0, sizeof(theme));
+    memcpy(&theme, &wz_def_theme, sizeof(theme));
+    theme.font = b->font;
+    theme.color1 = al_map_rgba_f(.5, .5, .5, 1);
+    theme.color2 = al_map_rgba_f(1, 1, 1,1);
+    
+    b->gui_confirm_event[b->gui_confirm_n] = EVENT_TYPE;
+    b->gui_confirm_n++;
+    
+    gui = wz_create_widget(0, b->x+(b->size-(w+2*b->tsize))/2, b->y+(b->size - (h+5*b->tsize))/2, GUI_CONFIRM);
+    wz_set_theme(gui, (WZ_THEME*)&theme);
+    
+    wz_create_fill_layout(gui, 0, 0, w+2*b->tsize, h+2*b->tsize, b->tsize, b->tsize, WZ_ALIGN_CENTRE, WZ_ALIGN_TOP, -1);
+    wz_create_textbox(gui, 0, 0, w, h, WZ_ALIGN_CENTRE, WZ_ALIGN_TOP, msg, 1, -1);
+    
+    wz_create_fill_layout(gui, 0, h+2*b->tsize, w+2*b->tsize, 2*b->tsize, b->tsize, b->tsize, WZ_ALIGN_CENTRE, WZ_ALIGN_CENTRE, -1);
+    
+    wz_create_button(gui, 0, 0, fsize*4, fsize*1.5, al_ustr_new("OK"), 1, BUTTON_OK);
+    wgt = (WZ_WIDGET *) wz_create_button(gui, 0, 0, fsize*4, fsize*1.5, al_ustr_new("Cancel"), 1, BUTTON_CANCEL);
+    wz_set_shortcut(wgt, ALLEGRO_KEY_ESCAPE, 0);
+    return gui;
+}
+
 WZ_WIDGET* create_settings_gui(Board *b){
     //xxx assume that screen is wider than taller for now
     int gui_w = b->xsize*0.7;
     int gui_h = b->ysize*0.8;
     int fsize = b->tsize*0.6;
     int lh=3;
-    WZ_WIDGET *gui;
+    WZ_WIDGET *gui, *wgt;
     static WZ_DEF_THEME theme;
     
     
@@ -249,7 +281,8 @@ WZ_WIDGET* create_settings_gui(Board *b){
     
     wz_create_fill_layout(gui, 0, fsize*lh*4, gui_w, fsize*lh, fsize*3, fsize, WZ_ALIGN_RIGHT, WZ_ALIGN_CENTRE, -1);
     wz_create_button(gui, 0, 0, fsize*4, fsize*1.5, al_ustr_new("OK"), 1, BUTTON_OK);
-    wz_create_button(gui, 0, 0, fsize*4, fsize*1.5, al_ustr_new("Cancel"), 1, BUTTON_CANCEL);
+    wgt = (WZ_WIDGET *) wz_create_button(gui, 0, 0, fsize*4, fsize*1.5, al_ustr_new("Cancel"), 1, BUTTON_CANCEL);
+    wz_set_shortcut(wgt, ALLEGRO_KEY_ESCAPE, 0);
     return gui;
 }
 
@@ -258,7 +291,7 @@ WZ_WIDGET* create_action_gui(Board *b){
     int gui_w = b->xsize - b->size - b->x;
     int gui_h = b->size;
     int fsize = b->tsize*0.6;
-    WZ_WIDGET *gui;
+    WZ_WIDGET *gui, *wgt;
     static WZ_DEF_THEME theme;
     
     /*
@@ -277,7 +310,8 @@ WZ_WIDGET* create_action_gui(Board *b){
     wz_create_button(gui, 0, 0, fsize*7, fsize*1.5, al_ustr_new("Connect"), 1, BUTTON_CONNECT);
     wz_create_button(gui, 0, 0, fsize*7, fsize*1.5, al_ustr_new("Seek game"), 1, BUTTON_SEEK);
     wz_create_button(gui, 0, 0, fsize*7, fsize*1.5, al_ustr_new("Flip board"), 1, BUTTON_FLIP);
-    wz_create_button(gui, 0, 0, fsize*7, fsize*1.5, al_ustr_new("Cancel"), 1, BUTTON_CANCEL);
+    wgt = (WZ_WIDGET *) wz_create_button(gui, 0, 0, fsize*7, fsize*1.5, al_ustr_new("Cancel"), 1, BUTTON_CANCEL);
+    wz_set_shortcut(wgt, ALLEGRO_KEY_ESCAPE, 0);
     return gui;
 }
 
@@ -301,7 +335,11 @@ WZ_WIDGET* create_term_gui(Board *b, Terminal *term, int id){
     wz_set_theme(gui, (WZ_THEME*)&theme);
     wgt = (WZ_WIDGET*) wz_create_box(gui, 0, 0, term_w+4, term_h+fh*1.5+4, -1);
     wgt->flags |= WZ_STATE_NOTWANT_FOCUS;
-    wz_create_editbox(gui, 2, term_h+2, term_w, fh*1.5, al_ustr_new(term->buf), 1, -1);
+    wgt = (WZ_WIDGET*) wz_create_editbox(gui, 2, term_h+2, term_w-5*fh, fh*1.5, al_ustr_new(term->buf), 1, -1);
+    wgt->flags |= WZ_STATE_HAS_FOCUS;
+    wgt = (WZ_WIDGET *) wz_create_button(gui, term_w-5*fh+2, term_h+2, 5*fh, fh*1.5, al_ustr_new("Close"), 1, BUTTON_CANCEL);
+    
+    wz_set_shortcut(wgt, ALLEGRO_KEY_ESCAPE, 0);
     return gui;
 }
                      
@@ -420,7 +458,8 @@ void gui_handler(Board *b, Game *g, ALLEGRO_EVENT *ev, ALLEGRO_EVENT_QUEUE *queu
                         {
                             irc_disconnect(g_irc_s);
                             b->connected = 0;
-                            emit_event(EVENT_IRC_DISCONNECT);
+                            al_ustr_assign_cstr(b->irc_status_msg, "Disconnected");
+//                            emit_event(EVENT_IRC_DISCONNECT);
                         }
                         else
                         {
@@ -441,8 +480,14 @@ void gui_handler(Board *b, Game *g, ALLEGRO_EVENT *ev, ALLEGRO_EVENT_QUEUE *queu
         {
             if(ev->type == WZ_TEXT_CHANGED){
              // xxx todo: check that satus is playing on irc and opponent exists!
+                if(b->connected <= 0 || b->game_state != GAME_PLAYING_IRC)
+                    break;
                 send_privmsg(b, al_cstr(b->opponent), (char *) al_cstr(((WZ_EDITBOX*)wgt)->text));
                 wz_set_text(wgt, USTR_NULL);
+            } else if(ev->type == WZ_BUTTON_PRESSED){
+                if(ev->user.data1 == BUTTON_CANCEL){
+                    remove_gui(b);
+                }
             }
             break;
         }
@@ -469,6 +514,19 @@ void gui_handler(Board *b, Game *g, ALLEGRO_EVENT *ev, ALLEGRO_EVENT_QUEUE *queu
                 }
             }
             break;
+        }
+        case GUI_CONFIRM:
+        {
+            if(ev->type == WZ_BUTTON_PRESSED){
+                switch(ev->user.data1){
+                    case BUTTON_OK:
+                        emit_event(b->gui_confirm_event[b->gui_confirm_n-1]);
+                    case BUTTON_CANCEL:
+                        b->gui_confirm_n--;
+                        remove_gui(b);
+                        break;
+                }
+            }
         }
     }
 }
@@ -1012,19 +1070,21 @@ RESTART:
                 case ALLEGRO_EVENT_KEY_CHAR:
                     keypress=1;
                     
-                    if(b.gui_n>1)
-                    {
-                        if(ev.keyboard.keycode == ALLEGRO_KEY_ESCAPE)
-                        {
-                            remove_gui(&b);
-                            redraw=1;
-                        }
-                    }
-                    else if (b.board_input)
+//                    if(b.gui_n>1)
+//                    {
+//                        if(ev.keyboard.keycode == ALLEGRO_KEY_ESCAPE)
+//                        {
+//                            remove_gui(&b);
+//                            redraw=1;
+//                        }
+//                    }
+//                    else
+                    if (b.board_input && b.gui_n <= 1)
                     {
                         switch(ev.keyboard.keycode){
                             case ALLEGRO_KEY_ESCAPE:
-                                noexit=0;
+                                add_gui(&b, event_queue, create_confirm_gui(&b, EVENT_EXIT, al_ustr_new("Exit application?")));
+//                                noexit=0;
                                 break;
     //                        case ALLEGRO_KEY_R:
     //                            restart=1;

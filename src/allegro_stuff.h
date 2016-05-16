@@ -28,6 +28,7 @@ typedef struct MemFile{
 
 // Prototypes
 
+int get_multiline_text_lines(const ALLEGRO_FONT *font, float max_width, const char *text);
 
 // Init mouse, kbd, addons, set path to resources path (or cwd), etc
 int init_allegro(void);

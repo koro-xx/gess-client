@@ -53,6 +53,7 @@ enum { // gui elements
     GUI_SETTINGS,
     GUI_CHAT,
     GUI_ACTION,
+    GUI_CONFIRM,
     BUTTON_OK,
     BUTTON_CANCEL,
     BUTTON_COLOR,
@@ -141,6 +142,8 @@ typedef struct Board {
     WZ_WIDGET* i_gui;
     WZ_WIDGET* settings_gui;
     
+    int gui_confirm_event[10];
+    int gui_confirm_n;
     //  extra displayed guis (in stack order)
     WZ_WIDGET *gui[5];
     void *guiel[5];
