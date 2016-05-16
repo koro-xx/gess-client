@@ -1,22 +1,16 @@
-* Maybe do as follows: g.brd is untouched. g.brd->child is what is modified by grab_block and locked blocks. Use it to detect rings and etc. 
+
 * Ring highlighting: mark the rings somehow to keep track of them visually
 * IRC connection interface 
-	- nick chooser
-	- status indicator
 	- reconnect/timeouts/etc
 	- resume/adjourn/store options
-* win check (after move, if win set game_status accordingly 
+* win check (after move, if win set game_status accordingly)
 * save game
-* settings, interface in general (player name, turn, last move)
+* last move + visual informationw when typing move coordinates
+* navigate history
 
-implementation for irc:
+	- allow console to display in separate window if non-mobile
+	- filter chat messages + add separate console for general logs
+    - add touch input
+* Restart / game type
 
-1) Make fixed size console with fixed size font
-	- Resize as needed (if smaller than half-screen, double the size, for instance)
-	- display in separate window if non-mobile
-	- add one-line text input in the bottom
-	- display all logs here (raw irc stuff)
-
-2) Make a chat window smilar to console
-
-
+* Maybe do as follows: g.brd is untouched. g.brd->child is what is modified by grab_block and locked blocks. Use it to detect rings and etc. 
