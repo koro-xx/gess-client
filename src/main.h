@@ -101,7 +101,7 @@ typedef struct Board {
     // real board
     int tsize;
     int size;
-    int pr;
+    int pr; // stone radius
     int x;
     int y;
     ALLEGRO_COLOR pcolor[3];
@@ -124,6 +124,7 @@ typedef struct Board {
     
     // fonts
     ALLEGRO_FONT *font; // fixed with please!
+    int fsize;
     
     // irc stuff
     ALLEGRO_USTR *opponent;

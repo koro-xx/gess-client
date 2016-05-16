@@ -35,6 +35,8 @@ Todo:
 
 #define FPS 60.0
 
+#define GUI_BG_COLOR al_map_rgba_f(.4, .4, .4, 1)
+#define GUI_FG_COLOR al_map_rgba_f(1, 1, 1, 1)
 
 // for irc
 char player_nick[32];
@@ -151,47 +153,52 @@ void init_board(Board *b){
 }
 
 
-void create_info_gui(Board *b, Game *g){
-    //xxx assume that screen is wider than taller for now
-    int gui_w = b->xsize - b->x - b->size;
-    int gui_h = b->size;
-    int fsize = b->tsize*0.5;
-    WZ_WIDGET *gui;
+WZ_WIDGET * new_wz_gui(int id, int x, int y, ALLEGRO_FONT *font, ALLEGRO_COLOR bg_color, ALLEGRO_COLOR fg_color){
     static WZ_DEF_THEME theme;
-    b->font = load_font_mem(text_font_mem, TEXT_FONT_FILE, -fsize);
-    
+    WZ_WIDGET *gui;
     /*
      Define custom theme
      wz_def_theme is a global vtable defined by the header
      */
     memset(&theme, 0, sizeof(theme));
     memcpy(&theme, &wz_def_theme, sizeof(theme));
-    theme.font = b->font;
-    theme.color1 = al_map_rgba_f(.5, .5, .5, 1);
-    theme.color2 = al_map_rgba_f(1, 1, 1,1);
+    theme.font = font;
+    theme.color1 = bg_color;
+    theme.color2 = fg_color; al_map_rgba_f(1, 1, 1,1);
     
-    gui = wz_create_widget(0, b->x + b->size, b->y, GUI_INFO);
+    gui=wz_create_widget(0, x, y, id);
     wz_set_theme(gui, (WZ_THEME*)&theme);
+    return gui;
+}
+
+void create_info_gui(Board *b, Game *g){
+    //xxx assume that screen is wider than taller for now
+    int gui_w = b->xsize - b->x - b->size;
+    int gui_h = b->size;
+    int fsize = b->fsize;
     
-    wz_create_fill_layout(gui, 0, 0, gui_w, gui_h/3, fsize/2, fsize/3, WZ_ALIGN_LEFT, WZ_ALIGN_TOP, -1);
+    WZ_WIDGET *gui = new_wz_gui(GUI_INFO, b->x+b->size, b->y, b->font, GUI_BG_COLOR, GUI_FG_COLOR);
+    
+    wz_create_fill_layout(gui, 0, 0, gui_w, 3*fsize, fsize/2, fsize/3, WZ_ALIGN_LEFT, WZ_ALIGN_TOP, -1);
     
     redraw_turn_buttons(b, gui_w, fsize);
-
     wz_create_textbox(gui, 0, 0, gui_w-fsize, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, b->s_player2_name,0, -1);
     wz_create_image_button(gui, 0, 0, gui_w, fsize, b->bmp_turn2, b->bmp_turn2, b->bmp_turn2, b->bmp_turn2, -1);
-    
-    wz_create_fill_layout(gui, 0, gui_h/3, gui_w, gui_h/3, fsize/2, fsize/3, WZ_ALIGN_LEFT, WZ_ALIGN_TOP, -1);
+
+    wz_create_fill_layout(gui, 0, 3*fsize, gui_w, 5*fsize, fsize/2, fsize/3, WZ_ALIGN_LEFT, WZ_ALIGN_TOP, -1);
     wz_create_textbox(gui, 0, 0, gui_w-fsize, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, b->server, 0, -1);
     wz_create_textbox(gui, 0, 0, al_get_text_width(b->font, "Nick:"), fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, al_ustr_new("Nick:"), 1, -1);
     wz_create_textbox(gui, 0, 0, gui_w-al_get_text_width(b->font, "Nick:")-fsize, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, b->nick, 0, -1);
     wz_create_button(gui, 0, 0, fsize*8, fsize*1.5, b->irc_status_msg, 0, BUTTON_IRC_STATUS);
-//    wz_create_box(gui, 0, 0, gui_w, fsize, -1); //xxx must hide box
+
+    wz_create_fill_layout(gui, gui_w-fsize*10, gui_h-4*fsize*3-3*fsize, fsize*10, 4*fsize*3, fsize/2, fsize, WZ_ALIGN_CENTRE, WZ_ALIGN_CENTRE, -1);
+
     wz_create_button(gui, 0, 0, fsize*8, fsize*1.5, al_ustr_new("Action"), 1, BUTTON_ACTION);
     wz_create_button(gui, 0, 0, fsize*8, fsize*1.5, al_ustr_new("Chat"), 1, BUTTON_CHAT);
     wz_create_button(gui, 0, 0, fsize*8, fsize*1.5, al_ustr_new("Settings"), 1, BUTTON_SETTINGS);
     wz_create_button(gui, 0, 0, fsize*8, fsize*1.5, al_ustr_new("Undo"), 1, BUTTON_UNDO);
 
-    wz_create_fill_layout(gui, 0, 2*gui_h/3, gui_w, gui_h/3, fsize/2, fsize/3, WZ_ALIGN_CENTRE, WZ_ALIGN_BOTTOM, -1);
+    wz_create_fill_layout(gui, 0, gui_h-3*fsize, gui_w, 3*fsize, fsize/2, fsize/3, WZ_ALIGN_CENTRE, WZ_ALIGN_BOTTOM, -1);
     
     wz_create_image_button(gui, 0, 0, gui_w, fsize, b->bmp_turn1, b->bmp_turn1, b->bmp_turn1, b->bmp_turn1, -1);
     wz_create_textbox(gui, 0, 0, gui_w-fsize, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, b->s_player1_name,0, -1);
@@ -202,21 +209,11 @@ void create_info_gui(Board *b, Game *g){
 WZ_WIDGET* create_confirm_gui(Board *b, int EVENT_TYPE, ALLEGRO_USTR *msg){
     int w = b->size/3;
     int h = get_multiline_text_lines(b->font, w, al_cstr(msg))*al_get_font_line_height(b->font);
-    int fsize = b->tsize*0.5;
+    int fsize = b->fsize;
+    WZ_WIDGET *wgt, *gui = new_wz_gui(GUI_CONFIRM, b->x+(b->size-(w+2*b->tsize))/2, b->y+(b->size - (h+5*b->tsize))/2, b->font, GUI_BG_COLOR, GUI_FG_COLOR);
 
-    WZ_WIDGET *gui, *wgt;
-    static WZ_DEF_THEME theme;
-    memset(&theme, 0, sizeof(theme));
-    memcpy(&theme, &wz_def_theme, sizeof(theme));
-    theme.font = b->font;
-    theme.color1 = al_map_rgba_f(.5, .5, .5, 1);
-    theme.color2 = al_map_rgba_f(1, 1, 1,1);
-    
     b->gui_confirm_event[b->gui_confirm_n] = EVENT_TYPE;
     b->gui_confirm_n++;
-    
-    gui = wz_create_widget(0, b->x+(b->size-(w+2*b->tsize))/2, b->y+(b->size - (h+5*b->tsize))/2, GUI_CONFIRM);
-    wz_set_theme(gui, (WZ_THEME*)&theme);
     
     wz_create_fill_layout(gui, 0, 0, w+2*b->tsize, h+2*b->tsize, b->tsize, b->tsize, WZ_ALIGN_CENTRE, WZ_ALIGN_TOP, -1);
     wz_create_textbox(gui, 0, 0, w, h, WZ_ALIGN_CENTRE, WZ_ALIGN_TOP, msg, 1, -1);
@@ -230,26 +227,12 @@ WZ_WIDGET* create_confirm_gui(Board *b, int EVENT_TYPE, ALLEGRO_USTR *msg){
 }
 
 WZ_WIDGET* create_settings_gui(Board *b){
-    //xxx assume that screen is wider than taller for now
     int gui_w = b->xsize*0.7;
     int gui_h = b->ysize*0.8;
     int fsize = b->tsize*0.6;
     int lh=3;
-    WZ_WIDGET *gui, *wgt;
-    static WZ_DEF_THEME theme;
-    
-    
-    /*
-     Define custom theme
-     wz_def_theme is a global vtable defined by the header
-     */
-    memset(&theme, 0, sizeof(theme));
-    memcpy(&theme, &wz_def_theme, sizeof(theme));
-    theme.font = load_font_mem(text_font_mem, TEXT_FONT_FILE, -fsize);
-    theme.color1 = al_map_rgba_f(.5, .5, .5, 1);
-    theme.color2 = al_map_rgba_f(1, 1, 1,1);
-    gui = wz_create_widget(0, (b->xsize-gui_w)/2, (b->ysize-gui_h)/2, GUI_SETTINGS);
-    wz_set_theme(gui, (WZ_THEME*)&theme);
+    WZ_WIDGET *wgt, *gui = new_wz_gui(GUI_SETTINGS,(b->xsize-gui_w)/2, (b->ysize-gui_h)/2,b->font, GUI_BG_COLOR, GUI_FG_COLOR);
+
     wz_create_fill_layout(gui, 0, 0, gui_w, fsize*lh, fsize, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, -1);
     wz_create_textbox(gui, 0, 0, fsize*7, fsize*1.5, WZ_ALIGN_RIGHT, WZ_ALIGN_CENTRE, al_ustr_new("IRC Server:"),1, -1);
     al_ustr_assign(b->s_server, b->server);
@@ -291,21 +274,8 @@ WZ_WIDGET* create_action_gui(Board *b){
     int gui_w = b->xsize - b->size - b->x;
     int gui_h = b->size;
     int fsize = b->tsize*0.6;
-    WZ_WIDGET *gui, *wgt;
-    static WZ_DEF_THEME theme;
-    
-    /*
-     Define custom theme
-     wz_def_theme is a global vtable defined by the header
-     */
-    memset(&theme, 0, sizeof(theme));
-    memcpy(&theme, &wz_def_theme, sizeof(theme));
-    theme.font = b->font;
-    theme.color1 = al_map_rgba_f(.5, .5, .5, 1);
-    theme.color2 = al_map_rgba_f(1, 1, 1,1);
-    
-    gui = wz_create_widget(0, b->x + b->size, b->y, GUI_ACTION);
-    wz_set_theme(gui, (WZ_THEME*)&theme);
+    WZ_WIDGET *wgt, *gui = new_wz_gui(GUI_ACTION, b->x+b->size, b->y, b->font, GUI_BG_COLOR, GUI_FG_COLOR);
+
     wz_create_fill_layout(gui, 0, 0, gui_w, gui_h, fsize, fsize*3, WZ_ALIGN_CENTRE, WZ_ALIGN_CENTRE, -1);
     wz_create_button(gui, 0, 0, fsize*7, fsize*1.5, al_ustr_new("Connect"), 1, BUTTON_CONNECT);
     wz_create_button(gui, 0, 0, fsize*7, fsize*1.5, al_ustr_new("Seek game"), 1, BUTTON_SEEK);
@@ -317,22 +287,11 @@ WZ_WIDGET* create_action_gui(Board *b){
 
 
 WZ_WIDGET* create_term_gui(Board *b, Terminal *term, int id){
-    int fh = al_get_font_line_height(b->font);
+    int fh = b->fsize;
     int term_w = term->w*al_get_glyph_advance(b->font, '0', '0');
     int term_h = term->h*fh;
-    WZ_WIDGET *gui, *wgt;
-    static WZ_DEF_THEME theme;
-    /*
-     Define custom theme
-     wz_def_theme is a global vtable defined by the header
-     */
-    memset(&theme, 0, sizeof(theme));
-    memcpy(&theme, &wz_def_theme, sizeof(theme));
-    theme.font = b->font;
-    theme.color1 = al_map_rgba_f(.3, .3, .3, 1);
-    theme.color2 = al_map_rgba_f(1, 1, 1,1);
-    gui = wz_create_widget(0, (b->xsize-term_w-4)/2, (b->ysize-term_h - 2*fh-4)/2, id);
-    wz_set_theme(gui, (WZ_THEME*)&theme);
+    WZ_WIDGET *wgt, *gui = new_wz_gui(GUI_CHAT, (b->xsize-term_w-4)/2, (b->ysize-term_h - 2*fh-4)/2, b->font, GUI_BG_COLOR, GUI_FG_COLOR);
+    
     wgt = (WZ_WIDGET*) wz_create_box(gui, 0, 0, term_w+4, term_h+fh*1.5+4, -1);
     wgt->flags |= WZ_STATE_NOTWANT_FOCUS;
     wgt = (WZ_WIDGET*) wz_create_editbox(gui, 2, term_h+2, term_w-5*fh, fh*1.5, al_ustr_new(term->buf), 1, -1);
@@ -552,6 +511,8 @@ void create_board(Board *b, Game *g){
     b->gui_n = 0;
     b->gui[0] = NULL;
     b->board_input = 1;
+    b->fsize = b->tsize*0.5;
+    b->font = load_font_mem(text_font_mem, TEXT_FONT_FILE, -b->fsize);
     create_info_gui(b, g);
 }
 
