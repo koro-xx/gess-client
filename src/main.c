@@ -45,13 +45,7 @@ Todo:
 #define GUI_BG_COLOR al_map_rgba_f(.4, .4, .4, 1)
 #define GUI_FG_COLOR al_map_rgba_f(1, 1, 1, 1)
 
-// for irc
-char player_nick[32];
-char opponent_nick[32];
-
 ALLEGRO_EVENT_SOURCE user_event_src;
-ALLEGRO_EVENT_QUEUE *event_queue = NULL;
-
 
 float RESIZE_DELAY = 0.04;
 float fixed_dt = 1.0/FPS;
@@ -413,7 +407,7 @@ void gui_handler(Board *b, Game *g, ALLEGRO_EVENT *ev, ALLEGRO_EVENT_QUEUE *queu
                         add_gui(b, queue, create_settings_gui(b));
                         break;
                     case BUTTON_CHAT:
-                        add_gui(b, event_queue, create_term_gui(b, b->chat_term, GUI_CHAT));
+                        add_gui(b, queue, create_term_gui(b, b->chat_term, GUI_CHAT));
                         break;
                     case BUTTON_IRC_STATUS:
                         if(b->connected)
@@ -429,7 +423,7 @@ void gui_handler(Board *b, Game *g, ALLEGRO_EVENT *ev, ALLEGRO_EVENT_QUEUE *queu
                         }
                         break;
                     case BUTTON_ACTION:
-                        add_gui(b, event_queue, create_action_gui(b));
+                        add_gui(b, queue, create_action_gui(b));
                         break;
                     case BUTTON_UNDO:
                         execute_undo(g, b);
@@ -819,6 +813,8 @@ int main(int argc, char **argv){
     int key_coords = 0;
     int type_coords = 0;
     int i;
+    ALLEGRO_EVENT_QUEUE *event_queue = NULL;
+
     
     // seed random number generator. comment out for debug
     srand((unsigned int) time(NULL));
