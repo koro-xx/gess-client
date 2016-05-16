@@ -166,7 +166,6 @@ typedef struct Board {
     ALLEGRO_BITMAP *bmp_turn2;
 } Board;
 
-
 // global variables
 extern ALLEGRO_EVENT_SOURCE user_event_src;
 extern char player_nick[32];

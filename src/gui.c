@@ -1,26 +1,10 @@
-  #include "gui.h"
-#include "main.h"
+#include "gui.h"
 #include "macros.h"
-#include "widgetz.h"
 #include "draw.h"
 #include "allegro_stuff.h"
 
 #define GUI_BG_COLOR al_map_rgba_f(.4, .4, .4, 1)
 #define GUI_FG_COLOR al_map_rgba_f(1, 1, 1, 1)
-
-void add_gui(Board *b, ALLEGRO_EVENT_QUEUE *queue, WZ_WIDGET *gui){
-    wz_register_sources(gui, queue);
-    b->gui[b->gui_n] = gui;
-    b->gui_n++;
-    wz_update(gui, 0);
-}
-
-void remove_gui(Board *b){
-    if(!b->gui_n) return;
-    b->gui_n--;
-    wz_destroy(b->gui[b->gui_n]);
-    b->gui[b->gui_n] = NULL;
-}
 
 void init_gui(Board *b){
     static WZ_DEF_THEME theme;
@@ -38,7 +22,7 @@ void init_gui(Board *b){
 }
 
 
-WZ_WIDGET * new_wz_gui(int id, int x, int y, WZ_THEME *theme){
+WZ_WIDGET *new_wz_gui(int id, int x, int y, WZ_THEME *theme){
     WZ_WIDGET *gui;
     gui=wz_create_widget(0, x, y, id);
     wz_set_theme(gui, theme);
@@ -174,4 +158,5 @@ WZ_WIDGET* create_term_gui(Board *b, Terminal *term, int id){
     
     wz_set_shortcut(wgt, ALLEGRO_KEY_ESCAPE, 0);
     return gui;
+    
 }
