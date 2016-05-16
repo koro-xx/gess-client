@@ -33,7 +33,7 @@ typedef struct Terminal{
 
 
 void term_draw(Terminal *t, int x, int y, ALLEGRO_FONT *font, ALLEGRO_COLOR fg_color, ALLEGRO_COLOR bg_color);
-int term_add_line(Terminal *t, char *str);
+int term_add_line(Terminal *t, const char *str);
 void term_destroy(Terminal *t);
 Terminal *term_create(int w, int h);
 

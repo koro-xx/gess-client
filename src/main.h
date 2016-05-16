@@ -175,7 +175,7 @@ irc_session_t *g_irc_s;
 // function prototypes
 void emit_event(int event_type);
 void emit_data_event(int event, intptr_t d1, intptr_t d2, intptr_t d3, intptr_t d4);
-int IRC_connect(char *server, int port, char *nick, char *channel);
+int IRC_connect(const char *server, int port, const char *nick, const char *channel);
 char *strdup(const char *s);
 
 

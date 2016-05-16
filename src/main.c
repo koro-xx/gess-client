@@ -1,13 +1,20 @@
 /*
+A Gess game client
+Read more about the game here: http://www.archim.org.uk/eureka/53/gess.html
+Licensed under the GNU GPLv3
+ 
 Todo:
 
-- allow coordinates to be typed for move
-- gui for nick choosing / new game / save game
+- add some feedback when typing coordinates
 - add request undo for irc
 - add store/adjourn/resume
-- ADD RING CHECK + RING INFO + RING HIGHLIGHT
+- add RING HIGHLIGHT
  */
 
+// add game_type (irc, 1v1 on same device, etc)
+// add restart option
+// add save/restore
+// add nick collision handling / reconnect / etc
 
 #ifdef _WIN32
     #define _CRT_SECURE_NO_WARNINGS
@@ -42,9 +49,6 @@ Todo:
 char player_nick[32];
 char opponent_nick[32];
 
-//#define MOVE_COLOR al_premul_rgba(255, 255, 0, 100)
-
-// this is mainly for testing, not actually used. use emit_event(EVENT_TYPE) to emit user events.
 ALLEGRO_EVENT_SOURCE user_event_src;
 ALLEGRO_EVENT_QUEUE *event_queue = NULL;
 
@@ -62,19 +66,19 @@ char *strdup (const char *s) {
     return d;                            // Return new memory
 }
 
-void chat_term_add_line(Terminal *t, char *origin, char *msg){
+void chat_term_add_line(Terminal *t, const char *origin, const char *msg){
     char str[512];
     snprintf(str, 512, "<%s> %s", origin, msg);
     term_add_line(t, str);
 }
 
-void send_privmsg(Board *b, char *nick, char *msg){
+void send_privmsg(Board *b, const char *nick, const char *msg){
     if(nick) irc_cmd_msg(g_irc_s, nick, msg);
     deblog("SENT: %s | %s", nick, msg);
     chat_term_add_line(b->chat_term, al_cstr(b->nick), msg);
 }
 
-void acknowledge_privmsg(Board *b, char *nick, char *msg){
+void acknowledge_privmsg(Board *b, const char *nick, const char *msg){
     char str[128];
     snprintf(str, 127, ":ACK %s", msg);
     send_privmsg(b, nick, str);
@@ -85,7 +89,6 @@ void send_move(Game *g, Board *b){
     snprintf(move, 32, ":%d,%s", g->moves, g->brd->last_move);
 //    strcpy(move+1, g->brd->last_move);
     send_privmsg(b, al_cstr(b->opponent), move);
-//    b->game_state = GAME_WAITING_MOVE_ACK;
     b->allow_move = 0;
 }
 
@@ -491,7 +494,6 @@ void gui_handler(Board *b, Game *g, ALLEGRO_EVENT *ev, ALLEGRO_EVENT_QUEUE *queu
 }
 
 
-
 void create_board(Board *b, Game *g){
     ALLEGRO_BITMAP *target = al_get_target_bitmap();
     int size;
@@ -516,8 +518,6 @@ void create_board(Board *b, Game *g){
     create_info_gui(b, g);
 }
 
-
-
 void destroy_board(Board *b){
     if(b->font){
         al_destroy_font(b->font);
@@ -527,19 +527,6 @@ void destroy_board(Board *b){
     while(b->gui_n) remove_gui(b);
     ndestroy_bitmap(b->board_bmp);
 }
-
-
-//xxx todo: replace highlighting with rectangles
-// add user interface
-// add game_type (irc, 1v1 on same device, etc)
-// add save/restore
-// add resume/adjourn
-// add nick collision handling / reconnect / etc
-    
-    // xxx todo: draw rectangle at last move source & dest
-    // create draw functions for stones and board rectangles
-
-
 
 
 void get_tile(Board *b, int *tx, int *ty, int x, int y){
@@ -556,7 +543,6 @@ void get_tile(Board *b, int *tx, int *ty, int x, int y){
     }
 }
 
-// xxx todo: update to account for rings
 void get_possible_moves(Game *g, Board *b){
     int di, dj;
     int k;
@@ -639,14 +625,17 @@ void focus_move(Board *b, int di, int dj){
     }
 }
 
-
+void unlock_block(Game *g, Board *b){
+    drop_block(g->brd, b->lock_i, b->lock_j, &b->lock_blk);
+    b->lock = 0;
+}
 
 int try_move(Game *g, Board *b, int i, int j){
     int ret = 0;
     
     if(b->move_mark[i][j] < 2){
+        unlock_block(g,b);
         return 0;
-        //        i=b->lock_i, j=b->lock_j;
     }
     
     
@@ -687,9 +676,7 @@ void enter_move(Game *g, Board *b){
     
     if(!b->allow_move) return;
     
-    //    if(((b->game_state == GAME_PLAYING_IRC) && (g->turn != b->player)) || b->game_state == GAME_WAITING_MOVE_ACK)
-    //        return;
-    
+ 
     if(b->lock){
         if(try_move(g, b, b->fi, b->fj))
             if(b->game_state == GAME_PLAYING_IRC){
@@ -700,10 +687,7 @@ void enter_move(Game *g, Board *b){
     }
 }
 
-void unlock_block(Game *g, Board *b){
-    drop_block(g->brd, b->lock_i, b->lock_j, &b->lock_blk);
-    b->lock = 0;
-}
+
 
 void process_irc_event(Game *g, Board *b, int type, ALLEGRO_USER_EVENT *ev)
 {
@@ -823,18 +807,16 @@ int main(int argc, char **argv){
     ALLEGRO_DISPLAY *display = NULL;
     double resize_time, old_time, play_time;
     int noexit, mouse_click,redraw, mouse_move,keypress, resizing, resize_update, mouse_button_down, restart;
-    float max_display_factor;
-    double mouse_up_time = 0, mouse_down_time = 0;
-    int wait_for_double_click = 0, hold_click_check = 0;
-    float DELTA_DOUBLE_CLICK = 0.2;
-    float DELTA_SHORT_CLICK = 0.1;
-    float DELTA_HOLD_CLICK = 0.3;
+// for touch input:
+//    double mouse_up_time = 0, mouse_down_time = 0;
+//    int wait_for_double_click = 0, hold_click_check = 0;
+//    float DELTA_DOUBLE_CLICK = 0.2;
+//    float DELTA_SHORT_CLICK = 0.1;
+//    float DELTA_HOLD_CLICK = 0.3;
     int mbdown_x, mbdown_y;
     Board b;
     Game g;
-    char move_str[64];
-    char opponent[64] = "koro";
-    int key_coords;
+    int key_coords = 0;
     int type_coords = 0;
     int i;
     
@@ -909,19 +891,6 @@ RESTART:
     init_game(&g);
     create_board(&b, &g);
     
-//    if(!MOBILE && !fullscreen) {
-//        al_set_target_backbuffer(display);
-//        al_resize_display(display, b.size, b.size);
-//        al_set_window_position(display, (desktop_xsize-b.size)/2, (desktop_ysize-b.size)/2);
-//        al_acknowledge_resize(display);
-//        al_set_target_backbuffer(display);
-//    }
-//    
-//	al_convert_bitmaps(); // turn bitmaps to memory bitmaps after resize (bug in allegro doesn't autoconvert)
-
-    
-    /// need to move this before restart!!!
-
     al_set_target_backbuffer(display);
 
 //  initialize flags
@@ -946,7 +915,6 @@ RESTART:
 
     // temp
     add_gui(&b, event_queue, b.i_gui);
-//    wz_register_sources(b.i_gui, event_queue);
     
     while(noexit)
     {
@@ -955,12 +923,11 @@ RESTART:
         dt = al_get_time() - old_time;
         old_time = al_get_time();
 
-        // temp
         for(i=0; i<b.gui_n; i++){
-            wz_update(b.gui[i], fixed_dt); // we may not be refreshing changes in the gui!
+            wz_update(b.gui[i], fixed_dt);
         }
         
-        if(b.gui_n>1) redraw=1;
+        if(b.gui_n>1) redraw=1; // temporary. don't want constant refresh during game (?)
         
         while(al_get_next_event(event_queue, &ev)){ // empty out the event queue
             if(ev.type == ALLEGRO_EVENT_DISPLAY_HALT_DRAWING){
@@ -969,7 +936,7 @@ RESTART:
                 break;
             }
             
-            // send event to topmost gui
+            // send event only to topmost gui
             if(b.gui_n) // ignore mouse events if focus is in gui
                 wz_send_event(b.gui[b.gui_n-1], &ev);
 
@@ -1031,34 +998,21 @@ RESTART:
                 case ALLEGRO_EVENT_KEY_CHAR:
                     keypress=1;
                     
-//                    if(b.gui_n>1)
-//                    {
-//                        if(ev.keyboard.keycode == ALLEGRO_KEY_ESCAPE)
-//                        {
-//                            remove_gui(&b);
-//                            redraw=1;
-//                        }
-//                    }
-//                    else
                     if (b.board_input && b.gui_n <= 1)
                     {
                         switch(ev.keyboard.keycode){
                             case ALLEGRO_KEY_ESCAPE:
                                 add_gui(&b, event_queue, create_confirm_gui(&b, EVENT_EXIT, al_ustr_new("Exit application?")));
-//                                noexit=0;
                                 break;
-    //                        case ALLEGRO_KEY_R:
-    //                            restart=1;
-    //                            goto RESTART;
-    //                            break;
-                                
+//     xxx todo: add clean up before restart
+//                            case ALLEGRO_KEY_R:
+//                                 restart=1;
+//                                 goto RESTART;
+//                                 break;
+//                                
                             case ALLEGRO_KEY_BACKSPACE:
                                 execute_undo(&g, &b);
                                 redraw=1;
-                                break;
-                            case ALLEGRO_KEY_SPACE:
-                                //params_gui(&g, &b, event_queue);
-                                //win_gui(&g, &b, event_queue);
                                 break;
                             case ALLEGRO_KEY_LEFT:
                                 focus_move(&b, -1, 0);
@@ -1116,7 +1070,7 @@ RESTART:
                     redraw=1;
                     break;
             }
-        }// while(al_get_next_event(event_queue, &ev));
+        }
 	
         if(resizing){
             if(al_get_time()-resize_time > RESIZE_DELAY){
@@ -1131,15 +1085,11 @@ RESTART:
             destroy_board(&b); // fix this
             create_board(&b, &g);
             add_gui(&b, event_queue, b.i_gui);
-//            wz_register_sources(b.i_gui, event_queue);
-
-//            al_resize_display(display, b.size + 1, b.size + 1);
+// produces artifacts:
+//            al_resize_display(display, b.xsize, b.size + 1);
             al_set_target_backbuffer(display);
-
-//            update_board(&g, &b);
-//			al_convert_bitmaps(); // turn bitmaps to video bitmaps
             redraw=1;
-        // android workaround, try removing:
+// android workaround, try removing:
 //            al_clear_to_color(BLACK_COLOR);
 //            al_flip_display();
             continue;

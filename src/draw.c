@@ -81,7 +81,7 @@ void draw_stone(Board *b, int i, int j, int style, int player){
         al_draw_filled_circle(b->x + b->tsize*i + (float)b->tsize/2, b->y + b->tsize*j + (float)b->tsize/2, b->pr, color_trans(b->pcolor[player],0.3));
     
     // draw outer circle
-    al_draw_circle(b->x + b->tsize*i + (float)b->tsize/2, b->y + b->tsize*j + (float)b->tsize/2, b->pr, color_trans(b->pcolor[3-player], 0.5),1); // al_map_rgba(100, 100, 100, 100),1
+    al_draw_circle(b->x + b->tsize*i + (float)b->tsize/2, b->y + b->tsize*j + (float)b->tsize/2, b->pr, color_trans(b->pcolor[3-player], 0.5),1);
 }
 
 #define draw_line(x0, y0, x1, y1, color, width) al_draw_line(x0+0.5, y0+0.5, x1+0.5, y1+0.5, color, width)
@@ -235,7 +235,7 @@ void draw_stuff(Game *g, Board *b){
     //xxx todo: fix
     if((g->moves > 0) && b->draw_last) draw_last_move(g,b);
     
-    // gui
+    // guis
     for(i=0; i<b->gui_n; i++)
     {
         wz_draw(b->gui[i]);
@@ -243,9 +243,4 @@ void draw_stuff(Game *g, Board *b){
             term_draw(b->chat_term, b->gui[i]->x+2, b->gui[i]->y+2, b->font, WHITE_COLOR, BLACK_COLOR);
         }
     }
-    
-    //    if(b->term_show){
-    //        al_draw_filled_rectangle(0,0, b->chat_term->w*al_get_glyph_advance(fixed_font, '0', '0'), b->chat_term->h*al_get_font_line_height(fixed_font), BLACK_COLOR);
-    //        term_draw(b->chat_term, 0, 0, fixed_font, WHITE_COLOR);
-    //    }
 }

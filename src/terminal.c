@@ -22,7 +22,7 @@ void term_destroy(Terminal *t){
 }
 
 /* Add line of text to terminal, max length 512, no carriage return */
-int term_add_line(Terminal *t, char *str){
+int term_add_line(Terminal *t, const char *str){
     if(!str) return -1;
     
     if(t->line[t->pos]) nfree(t->line[t->pos]);
@@ -31,9 +31,6 @@ int term_add_line(Terminal *t, char *str){
     return 0;
 }
 
-
-// TODO: need to fix the line width detection (it goes backwards, so for example a length 90 line turns into a length 10 followed by a length 80. Should be the opposite...
-// TODO: fixed_font is not fixed width! replace by something else!
 void copy_next_line(char *dest, char *str, int width, char **ptr){
     char *optr = *ptr;
     

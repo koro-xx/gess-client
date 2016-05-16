@@ -1,28 +1,5 @@
 /*
- * Copyright (C) 2004-2009 Georgy Yunaev gyunaev@ulduzsoft.com
- *
- * This example is free, and not covered by LGPL license. There is no
- * restriction applied to their modification, redistribution, using and so on.
- * You can study them, modify them, use them in your own program - either
- * completely or partially. By using it you may give me some credits in your
- * program, but you don't have to.
- *
- *
- * This example tests most features of libirc. It can join the specific
- * channel, welcoming all the people there, and react on some messages -
- * 'help', 'quit', 'dcc chat', 'dcc send', 'ctcp'. Also it can reply to
- * CTCP requests, receive DCC files and accept DCC chats.
- *
- * Features used:
- * - nickname parsing;
- * - handling 'channel' event to track the messages;
- * - handling dcc and ctcp events;
- * - using internal ctcp rely procedure;
- * - generating channel messages;
- * - handling dcc send and dcc chat events;
- * - initiating dcc send and dcc chat.
- *
- * $Id: irctest.c 109 2012-01-24 03:06:42Z gyunaev $
+ * Based on an example by Georgy Yunaev
  */
 
 #include <stdio.h>
@@ -184,7 +161,7 @@ int winsock_init(void){
 }
 #endif
 
-int IRC_connect(char *server, int port, char *nick, char *channel)
+int IRC_connect(const char *server, int port, const char *nick, const char *channel)
 {
     ALLEGRO_THREAD *irc_thread;
     irc_callbacks_t	callbacks;
@@ -225,8 +202,8 @@ int IRC_connect(char *server, int port, char *nick, char *channel)
         return 1;
     }
     
-    ctx.nick = nick;
-    ctx.channel = channel;
+    ctx.nick = strdup(nick);
+    ctx.channel = strdup(channel);
     
     irc_set_ctx (g_irc_s, &ctx);
     irc_option_set(g_irc_s, LIBIRC_OPTION_STRIPNICKS);
