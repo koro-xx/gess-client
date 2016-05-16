@@ -150,6 +150,7 @@ typedef struct Board {
     void *guiel[5];
     int gui_n;
     
+    WZ_THEME* theme;
     // info gui helper
     ALLEGRO_USTR *s_player1_name;
     ALLEGRO_USTR *s_player2_name;
