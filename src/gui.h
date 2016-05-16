@@ -15,7 +15,7 @@
 WZ_WIDGET* create_action_gui(Board *b);
 WZ_WIDGET* create_term_gui(Board *b, Terminal *term, int id);
 WZ_WIDGET* create_settings_gui(Board *b);
-WZ_WIDGET* create_confirm_gui(Board *b, int EVENT_TYPE, ALLEGRO_USTR *msg);
+WZ_WIDGET* create_yesno_gui(Board *b, int id, ALLEGRO_USTR *msg);
 void create_info_gui(Board *b, Game *g);
 void init_gui(Board *b);
 

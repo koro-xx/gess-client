@@ -43,6 +43,7 @@ Todo:
 
 #define FPS 60.0
 
+
 ALLEGRO_EVENT_SOURCE user_event_src;
 
 float RESIZE_DELAY = 0.04;
@@ -108,6 +109,14 @@ void try_irc_connect(Board *b){
     emit_event(EVENT_REDRAW);
 }
 
+void irc_disconnect_request(Board *b){
+    irc_disconnect(g_irc_s);
+    b->connected = 0;
+    b->game_type = MODE_SAME_DEVICE;
+    al_ustr_assign_cstr(b->irc_status_msg, "Connect");
+}
+
+
 void init_board(Board *b){
 
     b->pcolor[0] = NULL_COLOR;
@@ -127,7 +136,7 @@ void init_board(Board *b){
     b->allow_move = 1;
     b->chat_term = term_create(80, 24);
     b->opponent = al_ustr_new("");
-    b->irc_status_msg = al_ustr_new("Disconnected");
+    b->irc_status_msg = al_ustr_new("Connect");
     b->request_player = 0;
     
     // xxx todo: fix this shit (don't create them, let the gui create them)
@@ -139,7 +148,7 @@ void init_board(Board *b){
     b->s_player1_name = al_ustr_new("Player 1");
     b->s_player2_name = al_ustr_new("Player 2");
     
-    b->gui_confirm_n = 0;
+    b->game_type = MODE_SAME_DEVICE;
     
     b->bmp_turn1=NULL;
     b->bmp_turn2=NULL;
@@ -259,16 +268,9 @@ void gui_handler(Board *b, Game *g, ALLEGRO_EVENT *ev, ALLEGRO_EVENT_QUEUE *queu
                         break;
                     case BUTTON_IRC_STATUS:
                         if(b->connected)
-                        {
-                            irc_disconnect(g_irc_s);
-                            b->connected = 0;
-                            al_ustr_assign_cstr(b->irc_status_msg, "Disconnected");
-//                            emit_event(EVENT_IRC_DISCONNECT);
-                        }
+                            add_gui(b, queue, create_yesno_gui(b, GUI_CONFIRM_DISCONNECT, al_ustr_new("Disconnect from IRC server?")));
                         else
-                        {
                             try_irc_connect(b);
-                        }
                         break;
                     case BUTTON_ACTION:
                         add_gui(b, queue, create_action_gui(b));
@@ -308,7 +310,9 @@ void gui_handler(Board *b, Game *g, ALLEGRO_EVENT *ev, ALLEGRO_EVENT_QUEUE *queu
                         remove_gui(b);
                         break;
                     case BUTTON_CONNECT:
-                        if(b->connected == 0)
+                        if(b->connected)
+                            add_gui(b, queue, create_yesno_gui(b, GUI_CONFIRM_DISCONNECT, al_ustr_new("Disconnect from IRC server?")));
+                        else
                             try_irc_connect(b);
                         remove_gui(b);
                         break;
@@ -319,21 +323,30 @@ void gui_handler(Board *b, Game *g, ALLEGRO_EVENT *ev, ALLEGRO_EVENT_QUEUE *queu
             }
             break;
         }
-        case GUI_CONFIRM:
+        case GUI_CONFIRM_EXIT:
         {
-            if(ev->type == WZ_BUTTON_PRESSED){
-                switch(ev->user.data1){
-                    case BUTTON_OK:
-                        emit_event(b->gui_confirm_event[b->gui_confirm_n-1]);
-                    case BUTTON_CANCEL:
-                        b->gui_confirm_n--;
-                        remove_gui(b);
-                        break;
+            if(ev->type == WZ_BUTTON_PRESSED)
+            {
+                if(ev->user.data1 == BUTTON_OK){
+                        emit_event(EVENT_EXIT);
                 }
+                remove_gui(b);
             }
+            break;
+        }
+        case GUI_CONFIRM_DISCONNECT:
+        {
+            if(ev->type == WZ_BUTTON_PRESSED)
+            {
+                if(ev->user.data1 == BUTTON_OK)
+                    irc_disconnect_request(b);
+                remove_gui(b);
+            }
+            break;
         }
     }
 }
+
 
 
 void create_board(Board *b, Game *g){
@@ -836,7 +849,7 @@ RESTART:
                 case EVENT_IRC_CONNECT:
                     printf("MAIN THREAD: irc conencted.\n");
                     b.connected = 1;
-                    al_ustr_assign_cstr(b.irc_status_msg, "Connected");
+                    al_ustr_assign_cstr(b.irc_status_msg, "Disconnect");
                     redraw=1;
                     break;
                     
@@ -847,7 +860,7 @@ RESTART:
                     {
                         switch(ev.keyboard.keycode){
                             case ALLEGRO_KEY_ESCAPE:
-                                add_gui(&b, event_queue, create_confirm_gui(&b, EVENT_EXIT, al_ustr_new("Exit application?")));
+                                add_gui(&b, event_queue, create_yesno_gui(&b, GUI_CONFIRM_EXIT, al_ustr_new("Exit application?")));
                                 break;
 //     xxx todo: add clean up before restart
 //                            case ALLEGRO_KEY_R:

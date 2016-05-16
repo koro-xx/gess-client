@@ -31,7 +31,7 @@ WZ_WIDGET *new_wz_gui(int id, int x, int y, WZ_THEME *theme){
 
 void create_info_gui(Board *b, Game *g){
     //xxx assume that screen is wider than taller for now
-    int gui_w = b->xsize - b->x - b->size;
+    int gui_w = min(b->xsize - b->x - b->size, b->xsize*MAX_PANEL_PORTION);
     int gui_h = b->size;
     int fsize = b->fsize;
     
@@ -48,8 +48,9 @@ void create_info_gui(Board *b, Game *g){
     wz_create_textbox(gui, 0, 0, al_get_text_width(b->font, "Nick:"), fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, al_ustr_new("Nick:"), 1, -1);
     wz_create_textbox(gui, 0, 0, gui_w-al_get_text_width(b->font, "Nick:")-fsize, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, b->nick, 0, -1);
     wz_create_button(gui, 0, 0, fsize*8, fsize*1.5, b->irc_status_msg, 0, BUTTON_IRC_STATUS);
-    
-    wz_create_fill_layout(gui, gui_w-fsize*10, gui_h-4*fsize*3-3*fsize, fsize*10, 4*fsize*3, fsize/2, fsize, WZ_ALIGN_CENTRE, WZ_ALIGN_CENTRE, -1);
+
+
+    wz_create_fill_layout(gui, 0, gui_h-3.5*fsize*3-3*fsize, gui_w, 4*fsize*3, (gui_w-fsize*8)/2.1, fsize, WZ_ALIGN_CENTRE, WZ_ALIGN_TOP, -1);
     
     wz_create_button(gui, 0, 0, fsize*8, fsize*1.5, al_ustr_new("Action"), 1, BUTTON_ACTION);
     wz_create_button(gui, 0, 0, fsize*8, fsize*1.5, al_ustr_new("Chat"), 1, BUTTON_CHAT);
@@ -64,14 +65,11 @@ void create_info_gui(Board *b, Game *g){
     if(g->turn == 2) swap_bitmaps(b->bmp_turn1, b->bmp_turn2);
 }
 
-WZ_WIDGET* create_confirm_gui(Board *b, int EVENT_TYPE, ALLEGRO_USTR *msg){
+WZ_WIDGET* create_yesno_gui(Board *b, int id, ALLEGRO_USTR *msg){
     int w = b->size/3;
     int h = get_multiline_text_lines(b->font, w, al_cstr(msg))*al_get_font_line_height(b->font);
     int fsize = b->fsize;
-    WZ_WIDGET *wgt, *gui = new_wz_gui(GUI_CONFIRM, b->x+(b->size-(w+2*b->tsize))/2, b->y+(b->size - (h+5*b->tsize))/2, b->theme);
-    
-    b->gui_confirm_event[b->gui_confirm_n] = EVENT_TYPE;
-    b->gui_confirm_n++;
+    WZ_WIDGET *wgt, *gui = new_wz_gui(id, b->x+(b->size-(w+2*b->tsize))/2, b->y+(b->size - (h+5*b->tsize))/2, b->theme);
     
     wz_create_fill_layout(gui, 0, 0, w+2*b->tsize, h+2*b->tsize, b->tsize, b->tsize, WZ_ALIGN_CENTRE, WZ_ALIGN_TOP, -1);
     wz_create_textbox(gui, 0, 0, w, h, WZ_ALIGN_CENTRE, WZ_ALIGN_TOP, msg, 1, -1);
@@ -129,13 +127,13 @@ WZ_WIDGET* create_settings_gui(Board *b){
 
 WZ_WIDGET* create_action_gui(Board *b){
     //xxx assume that screen is wider than taller for now
-    int gui_w = b->xsize - b->size - b->x;
+    int gui_w = min(b->xsize - b->x - b->size, b->xsize*MAX_PANEL_PORTION);
     int gui_h = b->size;
-    int fsize = b->tsize*0.6;
+    int fsize = b->fsize;
     WZ_WIDGET *wgt, *gui = new_wz_gui(GUI_ACTION, b->x+b->size, b->y, b->theme);
     
-    wz_create_fill_layout(gui, 0, 0, gui_w, gui_h, fsize, fsize*3, WZ_ALIGN_CENTRE, WZ_ALIGN_CENTRE, -1);
-    wz_create_button(gui, 0, 0, fsize*7, fsize*1.5, al_ustr_new("Connect"), 1, BUTTON_CONNECT);
+    wz_create_fill_layout(gui, 0, 0, gui_w, gui_h, fsize, fsize, WZ_ALIGN_CENTRE, WZ_ALIGN_CENTRE, -1);
+    wz_create_button(gui, 0, 0, fsize*7, fsize*1.5, b->irc_status_msg, 0, BUTTON_CONNECT);
     wz_create_button(gui, 0, 0, fsize*7, fsize*1.5, al_ustr_new("Seek game"), 1, BUTTON_SEEK);
     wz_create_button(gui, 0, 0, fsize*7, fsize*1.5, al_ustr_new("Flip board"), 1, BUTTON_FLIP);
     wgt = (WZ_WIDGET *) wz_create_button(gui, 0, 0, fsize*7, fsize*1.5, al_ustr_new("Cancel"), 1, BUTTON_CANCEL);

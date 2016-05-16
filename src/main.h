@@ -45,6 +45,8 @@
 #define set_brd(t, i, j, k) do{ if(in_board(i,j)) t[i][j] = k; }while(0)
 
 #define MIN_PANEL_PORTION 0.2
+#define MAX_PANEL_PORTION 0.25
+
 // types
 
 enum { // gui elements
@@ -53,7 +55,8 @@ enum { // gui elements
     GUI_SETTINGS,
     GUI_CHAT,
     GUI_ACTION,
-    GUI_CONFIRM,
+    GUI_CONFIRM_EXIT,
+    GUI_CONFIRM_DISCONNECT,
     BUTTON_OK,
     BUTTON_CANCEL,
     BUTTON_COLOR,
@@ -73,6 +76,11 @@ enum { // status
     GAME_WAITING_MOVE_ACK,
     GAME_WAITING_OPPONENT_MOVE,
     GAME_SEEKING,
+};
+
+enum {
+    MODE_SAME_DEVICE,
+    MODE_ONLINE,
 };
 
 typedef struct Block {
@@ -143,8 +151,6 @@ typedef struct Board {
     WZ_WIDGET* i_gui;
     WZ_WIDGET* settings_gui;
     
-    int gui_confirm_event[10];
-    int gui_confirm_n;
     //  extra displayed guis (in stack order)
     WZ_WIDGET *gui[5];
     void *guiel[5];
