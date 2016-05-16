@@ -57,6 +57,7 @@ enum { // gui elements
     GUI_ACTION,
     GUI_CONFIRM_EXIT,
     GUI_CONFIRM_DISCONNECT,
+    GUI_MESSAGE,
     BUTTON_OK,
     BUTTON_CANCEL,
     BUTTON_COLOR,

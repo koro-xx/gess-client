@@ -82,6 +82,22 @@ WZ_WIDGET* create_yesno_gui(Board *b, int id, ALLEGRO_USTR *msg){
     return gui;
 }
 
+WZ_WIDGET* create_msg_gui(Board *b, int id, ALLEGRO_USTR *msg){
+    int w = b->size/3;
+    int h = get_multiline_text_lines(b->font, w, al_cstr(msg))*al_get_font_line_height(b->font);
+    int fsize = b->fsize;
+    WZ_WIDGET *wgt, *gui = new_wz_gui(id, b->x+(b->size-(w+2*b->tsize))/2, b->y+(b->size - (h+5*b->tsize))/2, b->theme);
+    
+    wz_create_fill_layout(gui, 0, 0, w+2*b->tsize, h+2*b->tsize, b->tsize, b->tsize, WZ_ALIGN_CENTRE, WZ_ALIGN_TOP, -1);
+    wz_create_textbox(gui, 0, 0, w, h, WZ_ALIGN_CENTRE, WZ_ALIGN_TOP, msg, 1, -1);
+    
+    wz_create_fill_layout(gui, 0, h+2*b->tsize, w+2*b->tsize, 2*b->tsize, b->tsize, b->tsize, WZ_ALIGN_RIGHT, WZ_ALIGN_CENTRE, -1);
+    
+    wgt = (WZ_WIDGET *) wz_create_button(gui, 0, 0, fsize*4, fsize*1.5, al_ustr_new("OK"), 1, BUTTON_OK);
+    wz_set_shortcut(wgt, ALLEGRO_KEY_ESCAPE, 0);
+    return gui;
+}
+
 WZ_WIDGET* create_settings_gui(Board *b){
     int gui_w = b->xsize*0.7;
     int gui_h = b->ysize*0.8;

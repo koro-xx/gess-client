@@ -344,6 +344,11 @@ void gui_handler(Board *b, Game *g, ALLEGRO_EVENT *ev, ALLEGRO_EVENT_QUEUE *queu
             }
             break;
         }
+        case GUI_MESSAGE:
+        {
+            if(ev->type == WZ_BUTTON_PRESSED)
+                remove_gui(b);
+        }
     }
 }
 
@@ -773,6 +778,11 @@ RESTART:
 
     // temp
     add_gui(&b, event_queue, b.i_gui);
+    
+    if(b.game_state == GAME_PLAYING_IRC)
+    {
+        add_gui(&b, event_queue, create_msg_gui(&b, GUI_MESSAGE, al_ustr_newf("Network game started:\n %s vs %s", al_cstr(b.nick), al_cstr(b.opponent))));
+    }
     
     while(noexit)
     {
