@@ -6,6 +6,9 @@ Work in progress.
 
 Licensed under the GPLv3.
 
+<p align="center">
+<img src="https://github.com/koro-xx/gess-client/blob/master/extra/gess-v0.01-screen.png" width="600" /> </p>
+
 ##Dependencies:
 
 Requires the following libraries:
