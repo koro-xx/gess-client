@@ -1,0 +1,18 @@
+Project->linker->additional lib dir->$(SolutionDir)lib\bin
+Project->linker->Additional dependencies->libircclient.lib
+
+Preprocessor definitions->
+_CRT_SECURE_NO_WARNINGS
+WIN32 (for libircclient)
+WIN32_LEAN_AND_MEAN (for winsock issues)
+
+VC++ Directories->include dirs->$(SolutionDir)lib\include
+
+libircclient bin+include dirs go to $(SolutionDir)\lib
+
+- enable antialiasing
+- remove winsock preprocessor stuff (only necessary for static build)
+
+fix strndup + strdup (make own)
+include macro.h in irc2.c (for sleep())
+
