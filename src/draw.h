@@ -2,7 +2,7 @@
 #define __gess__draw__
 
 #include <stdio.h>
-#include "main.h"
+#include "data_types.h"
 
 void draw_stuff(Game *g, Board *b);
 void draw_board(Board *b);

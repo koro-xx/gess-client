@@ -2,6 +2,19 @@
 #ifndef koro_macros_h
 #define koro_macros_h
 
+#ifdef ALLEGRO_ANDROID
+#include <allegro5/allegro_android.h>
+#include <android/log.h>
+
+#define MOBILE 1
+#define deblog(x,...) __android_log_print(ANDROID_LOG_INFO,"koro: ","%s:"x, __FILE__, ##__VA_ARGS__)
+#define errlog(x,...) __android_log_print(ANDROID_LOG_INFO,"koro: ","%s:"x, __FILE__, ##__VA_ARGS__)
+#else
+#define MOBILE 0
+#define deblog(x, ...) fprintf(stderr, "koro:%s:%u: "x"\n", __FILE__, __LINE__, ##__VA_ARGS__)
+#define errlog(x, ...) fprintf(stderr, "koro ERROR:%s:%u: "x"\n", __FILE__, __LINE__, ##__VA_ARGS__)
+#endif
+
 #define SWAP(x,y) do \
 { unsigned char swap_temp[sizeof(x) == sizeof(y) ? (signed)sizeof(x) : -1]; \
     memcpy(swap_temp,&y,sizeof(x)); \

@@ -375,8 +375,8 @@ void create_board(Board *b, Game *g){
     b->board_input = 1;
     b->fsize = b->tsize*0.5;
     b->font = load_font_mem(text_font_mem, TEXT_FONT_FILE, -b->fsize);
-    init_gui(b);
-    create_info_gui(b, g);
+    init_theme(b);
+    b->i_gui = create_info_gui(b, g);
 }
 
 void destroy_board(Board *b){

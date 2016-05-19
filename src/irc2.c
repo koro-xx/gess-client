@@ -7,6 +7,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <libircclient.h>
+#include "macros.h"
 #include "main.h"
 
 irc_session_t *g_irc_s;

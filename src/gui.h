@@ -1,24 +1,23 @@
-//
-//  gui.h
-//  gess
-//
-//  Created by koro on 5/16/16.
-//  Copyright (c) 2016 koro. All rights reserved.
-//
-
 #ifndef __gess__gui__
 #define __gess__gui__
 
-#include "widgetz.h"
-#include "main.h"
+#include "data_types.h"
 
-WZ_WIDGET* create_action_gui(Board *b);
-WZ_WIDGET* create_term_gui(Board *b, Terminal *term, int id);
-WZ_WIDGET* create_settings_gui(Board *b);
-WZ_WIDGET* create_yesno_gui(Board *b, int id, ALLEGRO_USTR *msg);
-WZ_WIDGET* create_msg_gui(Board *b, int id, ALLEGRO_USTR *msg);
+typedef struct GUI {
+    WZ_WIDGET wgt;
+    void (*draw)(struct GUI *gui);
+    struct GUI *next;
+} GUI;
 
-void create_info_gui(Board *b, Game *g);
-void init_gui(Board *b);
+GUI* create_action_gui(Board *b);
+GUI* create_term_gui(Board *b, Terminal *term, int id);
+GUI* create_settings_gui(Board *b);
+GUI* create_yesno_gui(Board *b, int id, ALLEGRO_USTR *msg);
+GUI* create_msg_gui(Board *b, int id, ALLEGRO_USTR *msg);
+GUI* create_info_gui(Board *b, Game *g);
+
+void init_theme(Board *b);
+
+
 
 #endif /* defined(__gess__gui__) */

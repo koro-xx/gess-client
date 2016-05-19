@@ -238,9 +238,10 @@ void draw_stuff(Game *g, Board *b){
     // guis
     for(i=0; i<b->gui_n; i++)
     {
-        wz_draw(b->gui[i]);
-        if(b->gui[i]->id == GUI_CHAT){
-            term_draw(b->chat_term, b->gui[i]->x+2, b->gui[i]->y+2, b->font, WHITE_COLOR, BLACK_COLOR);
-        }
+        b->gui[i]->draw(b->gui[i]);
+//        if(((WZ_WIDGET*)b->gui[i])->id == GUI_CHAT){
+//            term_draw(b->chat_term, ((WZ_WIDGET*)b->gui[i])->x+2, ((WZ_WIDGET*)b->gui[i])->y+2, b->font, WHITE_COLOR, BLACK_COLOR);
+//        }
     }
 }
+
