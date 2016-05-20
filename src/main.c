@@ -152,22 +152,27 @@ void init_board(Board *b){
     
     b->bmp_turn1=NULL;
     b->bmp_turn2=NULL;
-    
+    b->focus_board=1;
    // b->game_type = ?
 }
 
 void add_gui(Board *b, ALLEGRO_EVENT_QUEUE *queue, WZ_WIDGET *gui){
     wz_register_sources(gui, queue);
-    b->gui[b->gui_n] = gui;
-    b->gui_n++;
+    WZ_WIDGET_LIST *gui_l = malloc(sizeof(WZ_WIDGET_LIST));
+    
+    gui_l->wgt = gui;
+    gui_l->next = b->gui;
+    b->gui = gui_l;
+    
     wz_update(gui, 0);
 }
 
 void remove_gui(Board *b){
-    if(!b->gui_n) return;
-    b->gui_n--;
-    wz_destroy(b->gui[b->gui_n]);
-    b->gui[b->gui_n] = NULL;
+    WZ_WIDGET_LIST* foo;
+    if(!b->gui) return;
+    foo=b->gui;
+    b->gui = b->gui->next;
+    free(foo);
 }
 
 //xxx todo: add struct for settings
@@ -371,7 +376,7 @@ void create_board(Board *b, Game *g){
     draw_board(b);
     al_set_target_bitmap(target);
     b->gui_n = 0;
-    b->gui[0] = NULL;
+    b->gui = NULL;
     b->board_input = 1;
     b->fsize = b->tsize*0.5;
     b->font = load_font_mem(text_font_mem, TEXT_FONT_FILE, -b->fsize);
@@ -791,11 +796,15 @@ RESTART:
         dt = al_get_time() - old_time;
         old_time = al_get_time();
 
-        for(i=0; i<b.gui_n; i++){
-            wz_update(b.gui[i], fixed_dt);
+        {
+            WZ_WIDGET_LIST *gui_l = b.gui;
+            while(gui_l){
+                wz_update(gui_l->wgt, fixed_dt);
+                gui_l = gui_l->next;
+            }
         }
-        
-        if(b.gui_n>1) redraw=1; // temporary. don't want constant refresh during game (?)
+
+        if(!b.focus_board) redraw=1; // temporary. don't want constant refresh during game (?)
         
         while(al_get_next_event(event_queue, &ev)){ // empty out the event queue
             if(ev.type == ALLEGRO_EVENT_DISPLAY_HALT_DRAWING){
@@ -805,9 +814,10 @@ RESTART:
             }
             
             // send event only to topmost gui
-            if(b.gui_n) // ignore mouse events if focus is in gui
-                wz_send_event(b.gui[b.gui_n-1], &ev);
-
+            // only if focus is not on board
+            if(b.gui && !b.focus_board)
+                wz_send_event(b.gui->wgt, &ev);
+            
             switch(ev.type){
                 case EVENT_RESTART:
                     destroy_game(&g);
@@ -833,23 +843,27 @@ RESTART:
                     break;
                     
                 case ALLEGRO_EVENT_TOUCH_BEGIN:
-                    if(!b.board_input || b.gui_n > 1) break;
+                    if(!b.board_input || b.focus_board) break;
                     ev.mouse.x = ev.touch.x;
                     ev.mouse.y = ev.touch.y;
                     ev.mouse.button = 1;
                 case ALLEGRO_EVENT_MOUSE_BUTTON_DOWN:
-                    if(!b.board_input || b.gui_n > 1) break;
-                {
+                    if(!b.board_input || !b.focus_board) break;
                     enter_move(&g, &b);
                     redraw = 1;
                     break;
-                }
                     
                 case ALLEGRO_EVENT_MOUSE_AXES:
-                    if(!b.board_input || b.gui_n > 1) break;
+                    if(!b.board_input) break;
                     get_tile(&b, &b.fi, &b.fj, ev.mouse.x, ev.mouse.y);
+                    if(b.fi<0 || (b.gui && b.gui->next)){
+                        b.focus_board = 0;
+                    } else {
+                        b.focus_board = 1;
+                    }
                     redraw=1;
                     break;
+                    
                 case EVENT_PRIVMSG_RECEIVED:
                 case EVENT_CHANMSG_RECEIVED:
                     process_irc_event(&g, &b, ev.type, &ev.user);
@@ -866,12 +880,33 @@ RESTART:
                 case ALLEGRO_EVENT_KEY_CHAR:
                     keypress=1;
                     
-                    if (b.board_input && b.gui_n <= 1)
+                    if(b.gui && !b.gui->next)
+                    {
+                        if(ev.keyboard.keycode == ALLEGRO_KEY_ESCAPE)
+                        {
+                           add_gui(&b, event_queue, create_yesno_gui(&b, GUI_CONFIRM_EXIT, al_ustr_new("Exit application?")));
+                            redraw=1;
+                        }
+                        // xxx todo: handle keyboard focus
+                        else if(ev.keyboard.keycode == ALLEGRO_KEY_TAB)
+                        {
+                            if(b.focus_board)
+                            {
+                                b.focus_board=0;
+                                b.fi=-1;
+                                b.fj=-1;
+                            }
+                            else{
+                                b.focus_board=1;
+                                b.fi =19;
+                                b.fj =19;
+                            }
+                        }
+                    }
+            
+                    if (b.focus_board)
                     {
                         switch(ev.keyboard.keycode){
-                            case ALLEGRO_KEY_ESCAPE:
-                                add_gui(&b, event_queue, create_yesno_gui(&b, GUI_CONFIRM_EXIT, al_ustr_new("Exit application?")));
-                                break;
 //     xxx todo: add clean up before restart
 //                            case ALLEGRO_KEY_R:
 //                                 restart=1;

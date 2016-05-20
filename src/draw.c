@@ -174,6 +174,15 @@ void draw_last_move(Game *g, Board *b)
 }
 
 
+void draw_gui_list(WZ_WIDGET_LIST *gui_l){
+    
+    if(gui_l->next)
+        draw_gui_list(gui_l->next);
+    
+    wz_draw(gui_l->wgt);
+}
+
+
 // main draw routine
 void draw_stuff(Game *g, Board *b){
     int i,j;
@@ -235,13 +244,12 @@ void draw_stuff(Game *g, Board *b){
     //xxx todo: fix
     if((g->moves > 0) && b->draw_last) draw_last_move(g,b);
     
+    draw_gui_list(b->gui);
+
     // guis
-    for(i=0; i<b->gui_n; i++)
-    {
-        wz_draw(b->gui[i]);
+    
 //        if(((WZ_WIDGET*)b->gui[i])->id == GUI_CHAT){
 //            term_draw(b->chat_term, ((WZ_WIDGET*)b->gui[i])->x+2, ((WZ_WIDGET*)b->gui[i])->y+2, b->font, WHITE_COLOR, BLACK_COLOR);
 //        }
-    }
 }
 

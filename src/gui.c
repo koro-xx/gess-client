@@ -47,14 +47,14 @@ WZ_WIDGET* create_info_gui(Board *b, Game *g){
     int gui_w = min(b->xsize - b->x - b->size, b->xsize*MAX_PANEL_PORTION);
     int gui_h = b->size;
     int fsize = b->fsize;
-    WZ_WIDGET *gui = new_widget(GUI_INFO, b->x+b->size, b->y, b->theme);
+    WZ_WIDGET *wgt, *gui = new_widget(GUI_INFO, b->x+b->size, b->y, b->theme);
     
     wz_create_fill_layout(gui, 0, 0, gui_w, 3*fsize, fsize/2, fsize/3, WZ_ALIGN_LEFT, WZ_ALIGN_TOP, -1);
     
     redraw_turn_buttons(b, gui_w, fsize);
     wz_create_textbox(gui, 0, 0, gui_w-fsize, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, b->s_player2_name,0, -1);
-    wz_create_image_button(gui, 0, 0, gui_w, fsize, b->bmp_turn2, b->bmp_turn2, b->bmp_turn2, b->bmp_turn2, -1);
-    
+    wgt = (WZ_WIDGET*) wz_create_image_button(gui, 0, 0, gui_w, fsize, b->bmp_turn2, b->bmp_turn2, b->bmp_turn2, b->bmp_turn2, -1);
+    wgt->flags |= WZ_STATE_NOTWANT_FOCUS;
     wz_create_fill_layout(gui, 0, 3*fsize, gui_w, 5*fsize, fsize/2, fsize/3, WZ_ALIGN_LEFT, WZ_ALIGN_TOP, -1);
     wz_create_textbox(gui, 0, 0, gui_w-fsize, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, b->server, 0, -1);
     wz_create_textbox(gui, 0, 0, al_get_text_width(b->font, "Nick:"), fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, al_ustr_new("Nick:"), 1, -1);
@@ -71,7 +71,8 @@ WZ_WIDGET* create_info_gui(Board *b, Game *g){
     
     wz_create_fill_layout(gui, 0, gui_h-3*fsize, gui_w, 3*fsize, fsize/2, fsize/3, WZ_ALIGN_CENTRE, WZ_ALIGN_BOTTOM, -1);
     
-    wz_create_image_button(gui, 0, 0, gui_w, fsize, b->bmp_turn1, b->bmp_turn1, b->bmp_turn1, b->bmp_turn1, -1);
+    wgt = (WZ_WIDGET*) wz_create_image_button(gui, 0, 0, gui_w, fsize, b->bmp_turn1, b->bmp_turn1, b->bmp_turn1, b->bmp_turn1, -1);
+    wgt->flags |= WZ_STATE_NOTWANT_FOCUS;
     wz_create_textbox(gui, 0, 0, gui_w-fsize, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, b->s_player1_name,0, -1);
     if(g->turn == 2) swap_bitmaps(b->bmp_turn1, b->bmp_turn2);
     return gui;

@@ -129,13 +129,16 @@ typedef struct Board {
     int request_player;
     Terminal *chat_term;
     ALLEGRO_USTR *irc_status_msg;
+    
+    int focus_board;
+    
     // guis | todo: make one big gui (whole screen) and destroy/create other guis as widgets
     struct WZ_WIDGET* i_gui;
     struct WZ_WIDGET* settings_gui;
     
     //  extra displayed guis (in stack order)
-//    WZ_WIDGET_LIST gui;
-    WZ_WIDGET* gui[5];
+    WZ_WIDGET_LIST *gui;
+//    WZ_WIDGET* gui[5];
     void *guiel[5];
     int gui_n;
     
