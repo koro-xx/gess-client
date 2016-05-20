@@ -112,14 +112,37 @@ WZ_WIDGET* create_msg_gui(Board *b, int id, ALLEGRO_USTR *msg){
 }
 
 
-//typedef struct GUI_Settings {
-//    GUI gui;
-//    
-//    WZ_WIDGET *server;
-//    WZ_WIDGET *port;
-//    WZ_WIDGET *nick;
-//    WZ_WIDGET *color;
-//} GUI_Settings;
+void apply_settings_gui(Board *b, WZ_WIDGET *gui){
+    WZ_WIDGET *wgt = gui->first_child;
+    
+    while(wgt){
+        switch(wgt->id){
+            case EDITBOX_SERVER:
+                al_ustr_assign(b->server, ((WZ_TEXTBOX*)wgt)->text);
+                break;
+            case EDITBOX_PORT:
+                b->port = atoi(al_cstr(((WZ_TEXTBOX*)wgt)->text));
+                break;
+            case EDITBOX_CHANNEL:
+                al_ustr_assign(b->channel, ((WZ_TEXTBOX*)wgt)->text);
+                break;
+            case EDITBOX_NICK:
+                al_ustr_assign(b->nick, ((WZ_TEXTBOX*)wgt)->text);
+                break;
+            case BUTTON_COLOR:
+                if(al_ustr_has_prefix_cstr(((WZ_BUTTON*)wgt)->text, "White"))
+                {
+                    b->request_player = 1;
+                } else if (al_ustr_has_prefix_cstr(((WZ_BUTTON*)wgt)->text, "Black"))
+                {
+                    b->request_player = 2;
+                } else
+                    b->request_player = 0;
+                break;
+        }
+        wgt = wgt->next_sib;
+    }
+}
 
 WZ_WIDGET *create_settings_gui(Board *b){
     int gui_w = b->xsize*0.7;
@@ -131,25 +154,25 @@ WZ_WIDGET *create_settings_gui(Board *b){
     wz_create_fill_layout(gui, 0, 0, gui_w, fsize*lh, fsize, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, -1);
     wz_create_textbox(gui, 0, 0, fsize*7, fsize*1.5, WZ_ALIGN_RIGHT, WZ_ALIGN_CENTRE, al_ustr_new("IRC Server:"),1, -1);
     al_ustr_assign(b->s_server, b->server);
-    wz_create_editbox(gui, 0, 0, gui_w/2.5, fsize*1.5, b->s_server, 0, -1);
+    wz_create_editbox(gui, 0, 0, gui_w/2.5, fsize*1.5, b->s_server, 0, EDITBOX_SERVER);
     
     wz_create_textbox(gui, 0, 0, fsize*1, fsize*1.5, WZ_ALIGN_RIGHT, WZ_ALIGN_CENTRE, al_ustr_new(":"),1, -1);
     
     al_ustr_free(b->s_port);
     b->s_port = al_ustr_newf("%d", b->port);
-    wz_create_editbox(gui, 0, 0, fsize*4, fsize*1.5, b->s_port, 0, -1);
+    wz_create_editbox(gui, 0, 0, fsize*4, fsize*1.5, b->s_port, 0, EDITBOX_PORT);
     
     
     wz_create_fill_layout(gui, 0, fsize*lh, gui_w, fsize*lh, fsize, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, -1);
     wz_create_textbox(gui, 0, 0, fsize*10, fsize*1.5, WZ_ALIGN_RIGHT, WZ_ALIGN_CENTRE, al_ustr_new("IRC Channel:"),1, -1);
     al_ustr_assign(b->s_channel, b->channel);
-    wz_create_editbox(gui, 0, 0, gui_w/2.5, fsize*1.5, b->s_channel, 0, -1);
+    wz_create_editbox(gui, 0, 0, gui_w/2.5, fsize*1.5, b->s_channel, 0, EDITBOX_CHANNEL);
     
     wz_create_fill_layout(gui, 0, fsize*lh*2, gui_w, fsize*lh, fsize, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, -1);
     
     al_ustr_assign(b->s_nick, b->nick);
     wz_create_textbox(gui, 0, 0, fsize*10, fsize*1.5, WZ_ALIGN_RIGHT, WZ_ALIGN_CENTRE, al_ustr_new("IRC Nickname:"),1, -1);
-    wz_create_editbox(gui, 0, 0, gui_w/2.5, fsize*1.5, b->s_nick, 0, -1);
+    wz_create_editbox(gui, 0, 0, gui_w/2.5, fsize*1.5, b->s_nick, 0, EDITBOX_NICK);
     
     wz_create_fill_layout(gui, 0, fsize*lh*3, gui_w, fsize*lh, fsize, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, -1);
     wz_create_textbox(gui, 0, 0, fsize*10, fsize*1.5, WZ_ALIGN_RIGHT, WZ_ALIGN_CENTRE, al_ustr_new("Color request:"),1, -1);
@@ -176,6 +199,8 @@ WZ_WIDGET* create_action_gui(Board *b){
     wz_create_button(gui, 0, 0, fsize*7, fsize*1.5, b->irc_status_msg, 0, BUTTON_CONNECT);
     wz_create_button(gui, 0, 0, fsize*7, fsize*1.5, al_ustr_new("Seek game"), 1, BUTTON_SEEK);
     wz_create_button(gui, 0, 0, fsize*7, fsize*1.5, al_ustr_new("Flip board"), 1, BUTTON_FLIP);
+    wz_create_button(gui, 0, 0, fsize*7, fsize*1.5, al_ustr_new("Reset board"), 1, BUTTON_RESET);
+    wz_create_button(gui, 0, 0, fsize*7, fsize*1.5, al_ustr_new("Quit"), 1, BUTTON_QUIT);
     wgt = (WZ_WIDGET *) wz_create_button(gui, 0, 0, fsize*7, fsize*1.5, al_ustr_new("Cancel"), 1, BUTTON_CANCEL);
     wz_set_shortcut(wgt, ALLEGRO_KEY_ESCAPE, 0);
     return gui;

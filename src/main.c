@@ -156,43 +156,53 @@ void init_board(Board *b){
    // b->game_type = ?
 }
 
-void add_gui(Board *b, ALLEGRO_EVENT_QUEUE *queue, WZ_WIDGET *gui){
+void add_gui(WZ_WIDGET_LIST **gui_l, ALLEGRO_EVENT_QUEUE *queue, WZ_WIDGET *gui){
     wz_register_sources(gui, queue);
-    WZ_WIDGET_LIST *gui_l = malloc(sizeof(WZ_WIDGET_LIST));
+    WZ_WIDGET_LIST *newl = malloc(sizeof(WZ_WIDGET_LIST));
     
-    gui_l->wgt = gui;
-    gui_l->next = b->gui;
-    b->gui = gui_l;
+    newl->wgt = gui;
+    newl->next = *gui_l;
+    *gui_l = newl;
     
     wz_update(gui, 0);
 }
 
-void remove_gui(Board *b){
-    WZ_WIDGET_LIST* foo;
-    if(!b->gui) return;
-    foo=b->gui;
-    b->gui = b->gui->next;
-    free(foo);
-}
-
-//xxx todo: add struct for settings
-void settings_apply(Board *b, Game *g, ALLEGRO_EVENT *ev, ALLEGRO_EVENT_QUEUE *queue){
-    al_ustr_assign(b->server, b->s_server);
-    b->port = atoi(al_cstr(b->s_port));
-    al_ustr_assign(b->channel, b->s_channel);
-    al_ustr_assign(b->nick, b->s_nick);
-
-    if(al_ustr_has_prefix_cstr(b->s_color, "White"))
-    {
-        b->request_player = 1;
-    } else if (al_ustr_has_prefix_cstr(b->s_color, "Black"))
-    {
-        b->request_player = 2;
-    } else
-        b->request_player = 0;
+void remove_gui(WZ_WIDGET_LIST** gui_l, WZ_WIDGET* wgt){
+    WZ_WIDGET_LIST* foo = NULL;
+    if(!gui_l) return;
     
-    remove_gui(b);
+    if(!wgt || ((*gui_l)->wgt == wgt))
+    {
+        foo = *gui_l;
+        *gui_l = (*gui_l)->next;
+    }
+    else
+    {
+        while((*gui_l)->next)
+        {
+            if((*gui_l)->next->wgt == wgt){
+                foo = (*gui_l)->next;
+                (*gui_l)->next =(*gui_l)->next->next;
+                break;
+            }
+            *gui_l = (*gui_l)->next;
+        }
+    }
+    
+    if(foo)
+    {
+        wz_destroy(foo->wgt);
+        free(foo);
+    }
 }
+
+//void remove_gui(Board *b){
+//    WZ_WIDGET_LIST* foo;
+//    if(!b->gui) return;
+//    foo=b->gui;
+//    b->gui = b->gui->next;
+//    free(foo);
+//}
 
 void seek_game(Game *g, Board *b)
 {
@@ -244,10 +254,11 @@ void gui_handler(Board *b, Game *g, ALLEGRO_EVENT *ev, ALLEGRO_EVENT_QUEUE *queu
             if(ev->type == WZ_BUTTON_PRESSED){
                 switch(ev->user.data1){
                     case BUTTON_OK:
-                        settings_apply(b, g, ev, queue);
+                        apply_settings_gui(b, wgt->parent);
+                        remove_gui(&b->gui, wgt->parent);
                         break;
                     case BUTTON_CANCEL:
-                        remove_gui(b);
+                        remove_gui(&b->gui, wgt->parent);
                         break;
                     case BUTTON_COLOR:
                         if(al_ustr_has_prefix_cstr(b->s_color, "White"))
@@ -266,19 +277,19 @@ void gui_handler(Board *b, Game *g, ALLEGRO_EVENT *ev, ALLEGRO_EVENT_QUEUE *queu
             if(ev->type == WZ_BUTTON_PRESSED){
                 switch(ev->user.data1){
                     case BUTTON_SETTINGS:
-                        add_gui(b, queue, create_settings_gui(b));
+                        add_gui(&b->gui, queue, create_settings_gui(b));
                         break;
                     case BUTTON_CHAT:
-                        add_gui(b, queue, create_term_gui(b, b->chat_term, GUI_CHAT));
+                        add_gui(&b->gui, queue, create_term_gui(b, b->chat_term, GUI_CHAT));
                         break;
                     case BUTTON_IRC_STATUS:
                         if(b->connected)
-                            add_gui(b, queue, create_yesno_gui(b, GUI_CONFIRM_DISCONNECT, al_ustr_new("Disconnect from IRC server?")));
+                            add_gui(&b->gui, queue, create_yesno_gui(b, GUI_CONFIRM_DISCONNECT, al_ustr_new("Disconnect from IRC server?")));
                         else
                             try_irc_connect(b);
                         break;
                     case BUTTON_ACTION:
-                        add_gui(b, queue, create_action_gui(b));
+                        add_gui(&b->gui, queue, create_action_gui(b));
                         break;
                     case BUTTON_UNDO:
                         execute_undo(g, b);
@@ -297,7 +308,7 @@ void gui_handler(Board *b, Game *g, ALLEGRO_EVENT *ev, ALLEGRO_EVENT_QUEUE *queu
                 wz_set_text(wgt, USTR_NULL);
             } else if(ev->type == WZ_BUTTON_PRESSED){
                 if(ev->user.data1 == BUTTON_CANCEL){
-                    remove_gui(b);
+                    remove_gui(&b->gui, wgt->parent);
                 }
             }
             break;
@@ -305,24 +316,30 @@ void gui_handler(Board *b, Game *g, ALLEGRO_EVENT *ev, ALLEGRO_EVENT_QUEUE *queu
         case GUI_ACTION:
         {
             if(ev->type == WZ_BUTTON_PRESSED){
+                remove_gui(&b->gui, wgt->parent);
                 switch(ev->user.data1){
                     case BUTTON_SEEK:
                         seek_game(g, b);
-                        remove_gui(b);
                         break;
                     case BUTTON_FLIP:
                         flip_board(b);
-                        remove_gui(b);
                         break;
                     case BUTTON_CONNECT:
                         if(b->connected)
-                            add_gui(b, queue, create_yesno_gui(b, GUI_CONFIRM_DISCONNECT, al_ustr_new("Disconnect from IRC server?")));
+                            add_gui(&b->gui, queue, create_yesno_gui(b, GUI_CONFIRM_DISCONNECT, al_ustr_new("Disconnect from IRC server?")));
                         else
                             try_irc_connect(b);
-                        remove_gui(b);
+                        break;
+                    case BUTTON_RESET:
+                        if(b->game_state == GAME_PLAYING_IRC)
+                            add_gui(&b->gui, queue, create_msg_gui(b, -1, al_ustr_new("Cannot do that while playing online")));
+                            else
+                                emit_event(EVENT_RESTART);
+                        break;
+                    case BUTTON_QUIT:
+                         add_gui(&b->gui, queue, create_yesno_gui(b, GUI_CONFIRM_EXIT, al_ustr_new("Exit application?")));
                         break;
                     case BUTTON_CANCEL:
-                        remove_gui(b);
                         break;
                 }
             }
@@ -335,7 +352,7 @@ void gui_handler(Board *b, Game *g, ALLEGRO_EVENT *ev, ALLEGRO_EVENT_QUEUE *queu
                 if(ev->user.data1 == BUTTON_OK){
                         emit_event(EVENT_EXIT);
                 }
-                remove_gui(b);
+                remove_gui(&b->gui, wgt->parent);
             }
             break;
         }
@@ -345,14 +362,14 @@ void gui_handler(Board *b, Game *g, ALLEGRO_EVENT *ev, ALLEGRO_EVENT_QUEUE *queu
             {
                 if(ev->user.data1 == BUTTON_OK)
                     irc_disconnect_request(b);
-                remove_gui(b);
+                remove_gui(&b->gui, wgt->parent);
             }
             break;
         }
         case GUI_MESSAGE:
         {
             if(ev->type == WZ_BUTTON_PRESSED)
-                remove_gui(b);
+                remove_gui(&b->gui, wgt->parent);
         }
     }
 }
@@ -375,7 +392,6 @@ void create_board(Board *b, Game *g){
     al_clear_to_color(NULL_COLOR);
     draw_board(b);
     al_set_target_bitmap(target);
-    b->gui_n = 0;
     b->gui = NULL;
     b->board_input = 1;
     b->fsize = b->tsize*0.5;
@@ -390,7 +406,7 @@ void destroy_board(Board *b){
         b->font = NULL;
     }
     
-    while(b->gui_n) remove_gui(b);
+    while(b->gui) remove_gui(&b->gui, NULL);
     ndestroy_bitmap(b->board_bmp);
 }
 
@@ -782,11 +798,11 @@ RESTART:
     b.lock = 0;
 
     // temp
-    add_gui(&b, event_queue, b.i_gui);
+    add_gui(&b.gui, event_queue, b.i_gui);
     
     if(b.game_state == GAME_PLAYING_IRC)
     {
-        add_gui(&b, event_queue, create_msg_gui(&b, GUI_MESSAGE, al_ustr_newf("Network game started:\n %s vs %s", al_cstr(b.nick), al_cstr(b.opponent))));
+        add_gui(&b.gui, event_queue, create_msg_gui(&b, GUI_MESSAGE, al_ustr_newf("Network game started:\n %s vs %s", al_cstr(b.nick), al_cstr(b.opponent))));
     }
     
     while(noexit)
@@ -884,7 +900,7 @@ RESTART:
                     {
                         if(ev.keyboard.keycode == ALLEGRO_KEY_ESCAPE)
                         {
-                           add_gui(&b, event_queue, create_yesno_gui(&b, GUI_CONFIRM_EXIT, al_ustr_new("Exit application?")));
+                           add_gui(&b.gui, event_queue, create_yesno_gui(&b, GUI_CONFIRM_EXIT, al_ustr_new("Exit application?")));
                             redraw=1;
                         }
                         // xxx todo: handle keyboard focus
@@ -987,7 +1003,7 @@ RESTART:
 			al_acknowledge_resize(display);
             destroy_board(&b); // fix this
             create_board(&b, &g);
-            add_gui(&b, event_queue, b.i_gui);
+            add_gui(&b.gui, event_queue, b.i_gui);
 // produces artifacts:
 //            al_resize_display(display, b.xsize, b.size + 1);
             al_set_target_backbuffer(display);

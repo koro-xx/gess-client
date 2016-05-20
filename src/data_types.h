@@ -43,7 +43,13 @@ enum { // gui elements
     BUTTON_SEEK,
     BUTTON_FLIP,
     BUTTON_CONNECT,
-    BUTTON_UNDO
+    BUTTON_UNDO,
+    BUTTON_QUIT,
+    BUTTON_RESET,
+    EDITBOX_SERVER,
+    EDITBOX_PORT,
+    EDITBOX_CHANNEL,
+    EDITBOX_NICK,
 };
 
 enum { // status
@@ -134,13 +140,9 @@ typedef struct Board {
     
     // guis | todo: make one big gui (whole screen) and destroy/create other guis as widgets
     struct WZ_WIDGET* i_gui;
-    struct WZ_WIDGET* settings_gui;
     
     //  extra displayed guis (in stack order)
     WZ_WIDGET_LIST *gui;
-//    WZ_WIDGET* gui[5];
-    void *guiel[5];
-    int gui_n;
     
     WZ_THEME* theme;
     // info gui helper
