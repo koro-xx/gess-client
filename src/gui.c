@@ -181,17 +181,32 @@ GUI* create_action_gui(Board *b){
 }
 
 
-typedef struct GUI_Terminal {
-    GUI gui;
+typedef struct WZ_TERMINAL {
+    WZ_WIDGET wgt;
     
     Terminal *term;
 } GUI_Terminal;
 
+//typedef struct WZ_TERMINAL {
+//    WZ_WIDGET wgt;
+//    
+//    Terminal *term;
+//} GUI_Terminal;
+//
 
 void draw_GUI_Terminal(GUI *gui){
     draw_GUI(gui);
     term_draw(((GUI_Terminal *)gui)->term, ((WZ_WIDGET*)gui)->x+2, ((WZ_WIDGET*)gui)->y+2, ((WZ_WIDGET*)gui)->theme->get_font(((WZ_WIDGET*)gui)->theme, 1), WHITE_COLOR, BLACK_COLOR);
 }
+
+//int wz_term_proc(WZ_WIDGET* wgt, const ALLEGRO_EVENT* event){
+//    int ret = wz_widget_proc(wgt, event);
+//    if(event->type == WZ_DRAW){
+//        term_draw(((GUI_Terminal *)gui)->term, ((WZ_WIDGET*)gui)->x+2, ((WZ_WIDGET*)gui)->y+2, ((WZ_WIDGET*)gui)->theme->get_font(((WZ_WIDGET*)gui)->theme, 1), WHITE_COLOR, BLACK_COLOR);
+//    }
+//    return ret;
+//}
+// int wz_button_proc(WZ_WIDGET* wgt, const ALLEGRO_EVENT* event)
 
 GUI* create_term_gui(Board *b, Terminal *term, int id){
     int fh = b->fsize;
@@ -199,6 +214,8 @@ GUI* create_term_gui(Board *b, Terminal *term, int id){
     int term_h = term->h*fh;
     WZ_WIDGET *wgt, *gui = malloc(sizeof(GUI_Terminal));
     GUI_init((GUI *)gui, GUI_CHAT, (b->xsize-term_w-4)/2, (b->ysize-term_h - 2*fh-4)/2, b->theme);
+//    gui->proc = wz_term_proc;
+
     
     wgt = (WZ_WIDGET*) wz_create_box(gui, 0, 0, term_w+4, term_h+fh*1.5+4, -1);
     wgt->flags |= WZ_STATE_NOTWANT_FOCUS;

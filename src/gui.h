@@ -19,5 +19,6 @@ GUI* create_info_gui(Board *b, Game *g);
 void init_theme(Board *b);
 
 
+int wz_widget_proc(WZ_WIDGET* wgt, const ALLEGRO_EVENT* event);
 
 #endif /* defined(__gess__gui__) */
