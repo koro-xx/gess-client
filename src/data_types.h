@@ -78,6 +78,12 @@ typedef struct Game {
     char (*history)[5];
 } Game;
 
+typedef struct WZ_WIDGET_LIST {
+    WZ_WIDGET *wgt;
+    
+    struct WZ_WIDGET_LIST *next;
+} WZ_WIDGET_LIST;
+
 typedef struct Board {
     // screen
     int xsize;
@@ -124,11 +130,12 @@ typedef struct Board {
     Terminal *chat_term;
     ALLEGRO_USTR *irc_status_msg;
     // guis | todo: make one big gui (whole screen) and destroy/create other guis as widgets
-    struct GUI* i_gui;
-    struct GUI* settings_gui;
+    struct WZ_WIDGET* i_gui;
+    struct WZ_WIDGET* settings_gui;
     
     //  extra displayed guis (in stack order)
-    struct GUI *gui[5];
+//    WZ_WIDGET_LIST gui;
+    WZ_WIDGET* gui[5];
     void *guiel[5];
     int gui_n;
     

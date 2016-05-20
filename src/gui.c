@@ -21,28 +21,33 @@ void init_theme(Board *b){
     b->theme = (WZ_THEME*)&theme;
 }
 
-void draw_GUI(GUI *gui){
+void draw_GUI(WZ_WIDGET *gui){
     wz_draw((WZ_WIDGET*) gui);
 }
 
-// dirty hack to extend wz_widget (copying a wgt created by WidgetZ and freeing its memory by hand)
-void GUI_init(GUI *gui, int id, int x, int y, WZ_THEME *theme){
+//// dirty hack to extend wz_widget (copying a wgt created by WidgetZ and freeing its memory by hand)
+//void GUI_init(GUI *gui, int id, int x, int y, WZ_THEME *theme){
+//    WZ_WIDGET *wgt;
+//    wgt=wz_create_widget(0, x, y, id);
+//    wz_set_theme(wgt, theme);
+//    memcpy(gui, wgt, sizeof(*wgt));
+//    free(wgt);
+//    ((GUI*)gui)->draw = draw_GUI;
+//}
+
+WZ_WIDGET* new_widget(int id, int x, int y, WZ_THEME *theme){
     WZ_WIDGET *wgt;
     wgt=wz_create_widget(0, x, y, id);
     wz_set_theme(wgt, theme);
-    memcpy(gui, wgt, sizeof(*wgt));
-    free(wgt);
-    ((GUI*)gui)->draw = draw_GUI;
+    return wgt;
 }
 
-GUI* create_info_gui(Board *b, Game *g){
+WZ_WIDGET* create_info_gui(Board *b, Game *g){
     //xxx assume that screen is wider than taller for now
     int gui_w = min(b->xsize - b->x - b->size, b->xsize*MAX_PANEL_PORTION);
     int gui_h = b->size;
     int fsize = b->fsize;
-    WZ_WIDGET *gui = malloc(sizeof(GUI));
-    
-    GUI_init((GUI*)gui, GUI_INFO, b->x+b->size, b->y, b->theme);
+    WZ_WIDGET *gui = new_widget(GUI_INFO, b->x+b->size, b->y, b->theme);
     
     wz_create_fill_layout(gui, 0, 0, gui_w, 3*fsize, fsize/2, fsize/3, WZ_ALIGN_LEFT, WZ_ALIGN_TOP, -1);
     
@@ -69,16 +74,14 @@ GUI* create_info_gui(Board *b, Game *g){
     wz_create_image_button(gui, 0, 0, gui_w, fsize, b->bmp_turn1, b->bmp_turn1, b->bmp_turn1, b->bmp_turn1, -1);
     wz_create_textbox(gui, 0, 0, gui_w-fsize, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, b->s_player1_name,0, -1);
     if(g->turn == 2) swap_bitmaps(b->bmp_turn1, b->bmp_turn2);
-    return (GUI*)gui;
+    return gui;
 }
 
-GUI* create_yesno_gui(Board *b, int id, ALLEGRO_USTR *msg){
+WZ_WIDGET* create_yesno_gui(Board *b, int id, ALLEGRO_USTR *msg){
     int w = b->size/3;
     int h = get_multiline_text_lines(b->font, w, al_cstr(msg))*al_get_font_line_height(b->font);
     int fsize = b->fsize;
-    WZ_WIDGET *wgt, *gui = malloc(sizeof(GUI));
-    
-    GUI_init((GUI *)gui,id, b->x+(b->size-(w+2*b->tsize))/2, b->y+(b->size - (h+5*b->tsize))/2, b->theme);
+    WZ_WIDGET *wgt, *gui = new_widget(id, b->x+(b->size-(w+2*b->tsize))/2, b->y+(b->size - (h+5*b->tsize))/2, b->theme);
     
     wz_create_fill_layout(gui, 0, 0, w+2*b->tsize, h+2*b->tsize, b->tsize, b->tsize, WZ_ALIGN_CENTRE, WZ_ALIGN_TOP, -1);
     wz_create_textbox(gui, 0, 0, w, h, WZ_ALIGN_CENTRE, WZ_ALIGN_TOP, msg, 1, -1);
@@ -88,15 +91,14 @@ GUI* create_yesno_gui(Board *b, int id, ALLEGRO_USTR *msg){
     wz_create_button(gui, 0, 0, fsize*4, fsize*1.5, al_ustr_new("OK"), 1, BUTTON_OK);
     wgt = (WZ_WIDGET *) wz_create_button(gui, 0, 0, fsize*4, fsize*1.5, al_ustr_new("Cancel"), 1, BUTTON_CANCEL);
     wz_set_shortcut(wgt, ALLEGRO_KEY_ESCAPE, 0);
-    return (GUI*)gui;
+    return gui;
 }
 
-GUI* create_msg_gui(Board *b, int id, ALLEGRO_USTR *msg){
+WZ_WIDGET* create_msg_gui(Board *b, int id, ALLEGRO_USTR *msg){
     int w = b->size/3;
     int h = get_multiline_text_lines(b->font, w, al_cstr(msg))*al_get_font_line_height(b->font);
     int fsize = b->fsize;
-    WZ_WIDGET *wgt, *gui = malloc(sizeof(GUI));
-    GUI_init((GUI *)gui, id, b->x+(b->size-(w+2*b->tsize))/2, b->y+(b->size - (h+5*b->tsize))/2, b->theme);
+    WZ_WIDGET *wgt, *gui = new_widget(id, b->x+(b->size-(w+2*b->tsize))/2, b->y+(b->size - (h+5*b->tsize))/2, b->theme);
     
     wz_create_fill_layout(gui, 0, 0, w+2*b->tsize, h+2*b->tsize, b->tsize, b->tsize, WZ_ALIGN_CENTRE, WZ_ALIGN_TOP, -1);
     wz_create_textbox(gui, 0, 0, w, h, WZ_ALIGN_CENTRE, WZ_ALIGN_TOP, msg, 1, -1);
@@ -105,26 +107,25 @@ GUI* create_msg_gui(Board *b, int id, ALLEGRO_USTR *msg){
     
     wgt = (WZ_WIDGET *) wz_create_button(gui, 0, 0, fsize*4, fsize*1.5, al_ustr_new("OK"), 1, BUTTON_OK);
     wz_set_shortcut(wgt, ALLEGRO_KEY_ESCAPE, 0);
-    return (GUI*)gui;
+    return gui;
 }
 
 
-typedef struct GUI_Settings {
-    GUI gui;
-    
-    WZ_WIDGET *server;
-    WZ_WIDGET *port;
-    WZ_WIDGET *nick;
-    WZ_WIDGET *color;
-} GUI_Settings;
+//typedef struct GUI_Settings {
+//    GUI gui;
+//    
+//    WZ_WIDGET *server;
+//    WZ_WIDGET *port;
+//    WZ_WIDGET *nick;
+//    WZ_WIDGET *color;
+//} GUI_Settings;
 
-GUI* create_settings_gui(Board *b){
+WZ_WIDGET *create_settings_gui(Board *b){
     int gui_w = b->xsize*0.7;
     int gui_h = b->ysize*0.8;
     int fsize = b->tsize*0.6;
     int lh=3;
-    WZ_WIDGET *wgt, *gui = malloc(sizeof(GUI_Settings));
-    GUI_init((GUI *)gui, GUI_SETTINGS,(b->xsize-gui_w)/2, (b->ysize-gui_h)/2, b->theme);
+    WZ_WIDGET *wgt, *gui = new_widget(GUI_SETTINGS,(b->xsize-gui_w)/2, (b->ysize-gui_h)/2, b->theme);
     
     wz_create_fill_layout(gui, 0, 0, gui_w, fsize*lh, fsize, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, -1);
     wz_create_textbox(gui, 0, 0, fsize*7, fsize*1.5, WZ_ALIGN_RIGHT, WZ_ALIGN_CENTRE, al_ustr_new("IRC Server:"),1, -1);
@@ -160,16 +161,15 @@ GUI* create_settings_gui(Board *b){
     wgt = (WZ_WIDGET *) wz_create_button(gui, 0, 0, fsize*4, fsize*1.5, al_ustr_new("Cancel"), 1, BUTTON_CANCEL);
     wz_set_shortcut(wgt, ALLEGRO_KEY_ESCAPE, 0);
     
-    return (GUI*)gui;
+    return gui;
 }
 
-GUI* create_action_gui(Board *b){
+WZ_WIDGET* create_action_gui(Board *b){
     //xxx assume that screen is wider than taller for now
     int gui_w = min(b->xsize - b->x - b->size, b->xsize*MAX_PANEL_PORTION);
     int gui_h = b->size;
     int fsize = b->fsize;
-    WZ_WIDGET *wgt, *gui = malloc(sizeof(GUI));
-    GUI_init((GUI *)gui, GUI_ACTION, b->x+b->size, b->y, b->theme);
+    WZ_WIDGET *wgt, *gui = new_widget(GUI_ACTION, b->x+b->size, b->y, b->theme);
     
     wz_create_fill_layout(gui, 0, 0, gui_w, gui_h, fsize, fsize, WZ_ALIGN_CENTRE, WZ_ALIGN_CENTRE, -1);
     wz_create_button(gui, 0, 0, fsize*7, fsize*1.5, b->irc_status_msg, 0, BUTTON_CONNECT);
@@ -177,55 +177,56 @@ GUI* create_action_gui(Board *b){
     wz_create_button(gui, 0, 0, fsize*7, fsize*1.5, al_ustr_new("Flip board"), 1, BUTTON_FLIP);
     wgt = (WZ_WIDGET *) wz_create_button(gui, 0, 0, fsize*7, fsize*1.5, al_ustr_new("Cancel"), 1, BUTTON_CANCEL);
     wz_set_shortcut(wgt, ALLEGRO_KEY_ESCAPE, 0);
-    return (GUI*)gui;
+    return gui;
 }
 
 
-typedef struct WZ_TERMINAL {
-    WZ_WIDGET wgt;
-    
-    Terminal *term;
-} GUI_Terminal;
 
-//typedef struct WZ_TERMINAL {
-//    WZ_WIDGET wgt;
-//    
-//    Terminal *term;
-//} GUI_Terminal;
-//
-
-void draw_GUI_Terminal(GUI *gui){
-    draw_GUI(gui);
-    term_draw(((GUI_Terminal *)gui)->term, ((WZ_WIDGET*)gui)->x+2, ((WZ_WIDGET*)gui)->y+2, ((WZ_WIDGET*)gui)->theme->get_font(((WZ_WIDGET*)gui)->theme, 1), WHITE_COLOR, BLACK_COLOR);
-}
-
-//int wz_term_proc(WZ_WIDGET* wgt, const ALLEGRO_EVENT* event){
-//    int ret = wz_widget_proc(wgt, event);
-//    if(event->type == WZ_DRAW){
-//        term_draw(((GUI_Terminal *)gui)->term, ((WZ_WIDGET*)gui)->x+2, ((WZ_WIDGET*)gui)->y+2, ((WZ_WIDGET*)gui)->theme->get_font(((WZ_WIDGET*)gui)->theme, 1), WHITE_COLOR, BLACK_COLOR);
-//    }
-//    return ret;
+//void wz_terminal_proc(GUI *gui){
+//    draw_GUI(gui);
+//    term_draw(((GUI_Terminal *)gui)->term, ((WZ_WIDGET*)gui)->x+2, ((WZ_WIDGET*)gui)->y+2, ((WZ_WIDGET*)gui)->theme->get_font(((WZ_WIDGET*)gui)->theme, 1), WHITE_COLOR, BLACK_COLOR);
 //}
-// int wz_button_proc(WZ_WIDGET* wgt, const ALLEGRO_EVENT* event)
 
-GUI* create_term_gui(Board *b, Terminal *term, int id){
+int wz_terminal_proc(WZ_WIDGET* wgt, const ALLEGRO_EVENT* event){
+    if(event->type == WZ_DESTROY){
+        if(((WZ_TERMINAL *) wgt)->own){
+            term_destroy(((WZ_TERMINAL *)wgt)->term);
+        }
+    }
+    int ret = wz_widget_proc(wgt, event);
+    if(event->type == WZ_DRAW){
+        term_draw(((WZ_TERMINAL *)wgt)->term, wgt->x, wgt->y, wgt->theme->get_font(wgt->theme, 1), WHITE_COLOR, BLACK_COLOR);
+    }
+    return ret;
+}
+
+WZ_WIDGET *wz_create_terminal(WZ_WIDGET *parent, int x, int y, int w, int h, Terminal *term, int own, int id){
+    WZ_WIDGET* wgt = malloc(sizeof(WZ_TERMINAL));
+    
+    wz_init_widget(wgt, parent, x+parent->x, y+parent->y, w, h, id);
+    wgt->proc = wz_terminal_proc;
+
+    ((WZ_TERMINAL *)wgt)->term = term;
+    ((WZ_TERMINAL *)wgt)->own = own;
+    
+    return wgt;
+}
+
+WZ_WIDGET* create_term_gui(Board *b, Terminal *term, int id){
     int fh = b->fsize;
     int term_w = term->w*al_get_glyph_advance(b->font, '0', '0');
     int term_h = term->h*fh;
-    WZ_WIDGET *wgt, *gui = malloc(sizeof(GUI_Terminal));
-    GUI_init((GUI *)gui, GUI_CHAT, (b->xsize-term_w-4)/2, (b->ysize-term_h - 2*fh-4)/2, b->theme);
-//    gui->proc = wz_term_proc;
+    WZ_WIDGET *wgt, *gui = new_widget(GUI_CHAT, (b->xsize-term_w-4)/2, (b->ysize-term_h - 2*fh-4)/2, b->theme);
 
     
     wgt = (WZ_WIDGET*) wz_create_box(gui, 0, 0, term_w+4, term_h+fh*1.5+4, -1);
     wgt->flags |= WZ_STATE_NOTWANT_FOCUS;
+    wz_create_terminal(gui, 2, 2, term_w, term_h, term, 0, -1);
     wgt = (WZ_WIDGET*) wz_create_editbox(gui, 2, term_h+2, term_w-5*fh, fh*1.5, al_ustr_new(term->buf), 1, -1);
     wgt->flags |= WZ_STATE_HAS_FOCUS;
     wgt = (WZ_WIDGET *) wz_create_button(gui, term_w-5*fh+2, term_h+2, 5*fh, fh*1.5, al_ustr_new("Close"), 1, BUTTON_CANCEL);
     wz_set_shortcut(wgt, ALLEGRO_KEY_ESCAPE, 0);
     
-    ((GUI_Terminal*) gui)->term = term;
-    ((GUI*) gui)->draw = draw_GUI_Terminal;
-    return (GUI*)gui;
+    return gui;
     
 }
