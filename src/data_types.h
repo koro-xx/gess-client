@@ -142,12 +142,13 @@ typedef struct Board {
     WZ_WIDGET *gui;
     
     WZ_THEME* theme;
+    WZ_THEME* theme_alt;
     // info gui helper
     
     ALLEGRO_USTR *player1_name;
     ALLEGRO_USTR *player2_name;
-    ALLEGRO_USTR *player1_mark;
-    ALLEGRO_USTR *player2_mark;
+    WZ_WIDGET *player1_wgt;
+    WZ_WIDGET *player2_wgt;
     
     
     ALLEGRO_BITMAP *bmp_turn1;

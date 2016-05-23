@@ -144,8 +144,6 @@ void init_board(Board *b){
     b->gui = NULL;
     
     b->game_type = MODE_SAME_DEVICE;
-    b->player1_mark = al_ustr_new(" **");
-    b->player2_mark = al_ustr_new("   ");
     b->focus_board=1;
 }
 
@@ -166,11 +164,8 @@ void remove_gui(WZ_WIDGET* wgt, int stack){
 
 void swap_turn(Game *g, Board *b)
 {
-    ALLEGRO_USTR *foo = al_ustr_dup(b->player1_mark);
-    al_ustr_assign(b->player1_mark, b->player2_mark);
-    al_ustr_assign(b->player2_mark, foo);
-    al_ustr_free(foo);
     g->turn = (g->turn == 1) ? 2 : 1;
+    SWAP(b->player1_wgt->theme, b->player2_wgt->theme);
 }
 
 
@@ -196,14 +191,11 @@ void flip_board(Board *b){
     al_clear_to_color(NULL_COLOR);
     draw_board(b);
     
+    SWAP(b->player1_wgt->theme, b->player2_wgt->theme);
+ 
     tmp=al_ustr_dup(b->player1_name);
     al_ustr_assign(b->player1_name, b->player2_name);
     al_ustr_assign(b->player2_name, tmp);
-    al_ustr_free(tmp);
-    
-    tmp=al_ustr_dup(b->player1_mark);
-    al_ustr_assign(b->player1_mark, b->player2_mark);
-    al_ustr_assign(b->player2_mark, tmp);
     al_ustr_free(tmp);
     
     al_set_target_bitmap(target);
@@ -404,6 +396,7 @@ void create_base_gui(Board *b, Game *g, ALLEGRO_EVENT_QUEUE *queue){
         b->i_gui = create_info_gui(b, g);
         add_gui(b->gui, queue, b->i_gui, 1);
     }
+    wz_set_theme(b->player1_wgt, b->theme_alt);
 }
 
 void destroy_base_gui(Board *b){

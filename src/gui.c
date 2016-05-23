@@ -4,10 +4,12 @@
 #include "allegro_stuff.h"
 
 #define GUI_BG_COLOR al_map_rgba_f(.4, .4, .4, 1)
+#define GUI_BG_COLOR_ALT al_map_rgba_f(.7, .7, .7, 1)
+
 #define GUI_FG_COLOR al_map_rgba_f(1, 1, 1, 1)
 
 void init_theme(Board *b){
-    static WZ_DEF_THEME theme;
+    static WZ_DEF_THEME theme, theme_alt;
     /*
      Define custom theme
      wz_def_theme is a global vtable defined by the header
@@ -19,6 +21,13 @@ void init_theme(Board *b){
     theme.color1 = GUI_BG_COLOR;
     theme.color2 = GUI_FG_COLOR;
     b->theme = (WZ_THEME*)&theme;
+    
+    memset(&theme_alt, 0, sizeof(theme_alt));
+    memcpy(&theme_alt, &wz_def_theme, sizeof(theme_alt));
+    theme_alt.font = b->font;
+    theme_alt.color1 = GUI_BG_COLOR_ALT;
+    theme_alt.color2 = GUI_FG_COLOR;
+    b->theme_alt = (WZ_THEME*)&theme_alt;
 }
 
 void draw_GUI(WZ_WIDGET *gui){
@@ -61,14 +70,14 @@ WZ_WIDGET* create_action_gui_2(WZ_WIDGET* parent, Board *b, int x, int y, int w)
     //new_widget(GUI_ACTION, 0, 0, b->theme);
     
     wz_create_fill_layout(gui, 0, 0, w, gui->h, fsize, fsize, WZ_ALIGN_CENTRE, WZ_ALIGN_CENTRE, -1);
-    wgt = (WZ_WIDGET *) wz_create_button(gui, 0, 0, fsize*7, fsize*1.5, al_ustr_new("Main menu"), 1, BUTTON_CANCEL);
+    wgt = (WZ_WIDGET *) wz_create_button(gui, 0, 0, fsize*8, fsize*1.5, al_ustr_new("Main menu"), 1, BUTTON_CANCEL);
 //    wz_set_shortcut(wgt, ALLEGRO_KEY_ESCAPE, 0);
 
 //    wz_create_button(gui, 0, 0, fsize*7, fsize*1.5, b->irc_status_msg, 0, BUTTON_CONNECT);
-    wz_create_button(gui, 0, 0, fsize*7, fsize*1.5, al_ustr_new("Seek game"), 1, BUTTON_SEEK);
-    wz_create_button(gui, 0, 0, fsize*7, fsize*1.5, al_ustr_new("Flip board"), 1, BUTTON_FLIP);
-    wz_create_button(gui, 0, 0, fsize*7, fsize*1.5, al_ustr_new("Reset board"), 1, BUTTON_RESET);
-    wz_create_button(gui, 0, 0, fsize*7, fsize*1.5, al_ustr_new("Quit"), 1, BUTTON_QUIT);
+    wz_create_button(gui, 0, 0, fsize*8, fsize*1.5, al_ustr_new("Seek game"), 1, BUTTON_SEEK);
+    wz_create_button(gui, 0, 0, fsize*8, fsize*1.5, al_ustr_new("Flip board"), 1, BUTTON_FLIP);
+    wz_create_button(gui, 0, 0, fsize*8, fsize*1.5, al_ustr_new("Reset board"), 1, BUTTON_RESET);
+    wz_create_button(gui, 0, 0, fsize*8, fsize*1.5, al_ustr_new("Quit"), 1, BUTTON_QUIT);
     if(parent) wz_attach(gui, parent);
     return gui;
 }
@@ -82,11 +91,11 @@ WZ_WIDGET* create_action_gui_1(WZ_WIDGET* parent, Board *b, int x, int y, int w)
     gui->w = w; gui->h = butn*fsize*2.5+fsize;
 
     wz_create_fill_layout(gui, 0, 0, w, gui->h, (w-fsize*8)/2.1, fsize, WZ_ALIGN_CENTRE, WZ_ALIGN_TOP, -1);
-
-    wz_create_button(gui, 0, 0, fsize*7, fsize*1.5, al_ustr_new("Show more"), 1, BUTTON_ACTION);
-    wz_create_button(gui, 0, 0, fsize*7, fsize*1.5, al_ustr_new("Chat"), 1, BUTTON_CHAT);
-    wz_create_button(gui, 0, 0, fsize*7, fsize*1.5, al_ustr_new("Settings"), 1, BUTTON_SETTINGS);
-    wz_create_button(gui, 0, 0, fsize*7, fsize*1.5, al_ustr_new("Undo"), 1, BUTTON_UNDO);
+    //xxx todo: move chat + settings to irc widget. Set it as widget.
+    wz_create_button(gui, 0, 0, fsize*8, fsize*1.5, al_ustr_new("Show more"), 1, BUTTON_ACTION);
+    wz_create_button(gui, 0, 0, fsize*8, fsize*1.5, al_ustr_new("Chat"), 1, BUTTON_CHAT);
+    wz_create_button(gui, 0, 0, fsize*8, fsize*1.5, al_ustr_new("Settings"), 1, BUTTON_SETTINGS);
+    wz_create_button(gui, 0, 0, fsize*8, fsize*1.5, al_ustr_new("Undo"), 1, BUTTON_UNDO);
     if(parent) wz_attach(gui, parent);
     return gui;
 }
@@ -98,13 +107,9 @@ WZ_WIDGET* create_info_gui(Board *b, Game *g){
     int fsize = b->fsize;
     WZ_WIDGET *wgt, *gui = new_widget(GUI_INFO, b->x+b->size + PANEL_SPACE*b->size, b->y, NULL);
     
-    wz_create_fill_layout(gui, 0, 0, gui_w, 3*fsize, fsize/2, fsize/3, WZ_ALIGN_CENTRE, WZ_ALIGN_TOP, -1);
+    b->player2_wgt = (WZ_WIDGET*)wz_create_fill_layout(gui, 0, 0, gui_w, 3*fsize, fsize/2, fsize/3, WZ_ALIGN_CENTRE, WZ_ALIGN_TOP, -1);
     
- //   redraw_turn_buttons(b, gui_w-fsize, fsize);
-    wz_create_textbox(gui, 0, 0, fsize*2, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, b->player2_mark,0, -1);
-    wz_create_textbox(gui, fsize*2, 0, gui_w-2*fsize-fsize, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, b->player2_name,0, -1);
-//    wgt = (WZ_WIDGET*) wz_create_image_button(gui, 0, 0, gui_w, fsize, b->bmp_turn2, b->bmp_turn2, b->bmp_turn2, b->bmp_turn2, -1);
-//    wgt->flags |= WZ_STATE_NOTWANT_FOCUS;
+    wz_create_textbox(gui, 0, 0, gui_w-fsize, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, b->player2_name,0, -1);
     
     wz_create_fill_layout(gui, 0, 3*fsize, gui_w, 5*fsize, fsize/2, fsize/3, WZ_ALIGN_CENTRE, WZ_ALIGN_TOP, -1);
     wz_create_textbox(gui, 0, 0, gui_w-fsize, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, b->server, 0, -1);
@@ -115,13 +120,9 @@ WZ_WIDGET* create_info_gui(Board *b, Game *g){
     
    create_action_gui_1(gui, b, 0, fsize*8, gui_w);
     
-    wz_create_fill_layout(gui, 0, gui_h-3*fsize, gui_w, 3*fsize, fsize/2, fsize/3, WZ_ALIGN_CENTRE, WZ_ALIGN_BOTTOM, -1);
+    b->player1_wgt = (WZ_WIDGET*)wz_create_fill_layout(gui, 0, gui_h-3*fsize, gui_w, 3*fsize, fsize/2, fsize/3, WZ_ALIGN_CENTRE, WZ_ALIGN_BOTTOM, -1);
     
-//    wgt = (WZ_WIDGET*) wz_create_image_button(gui, 0, 0, gui_w, fsize, b->bmp_turn1, b->bmp_turn1, b->bmp_turn1, b->bmp_turn1, -1);
-//    wgt->flags |= WZ_STATE_NOTWANT_FOCUS;
-    wz_create_textbox(gui, 0, 0, 2*fsize, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, b->player1_mark, 0, -1);
-    wz_create_textbox(gui, 2*fsize, 0, gui_w-2*fsize-fsize, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, b->player1_name,0, -1);
-   // if(g->turn == 2) swap_bitmaps(b->bmp_turn1, b->bmp_turn2);
+    wz_create_textbox(gui, 0, 0, gui_w-fsize, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, b->player1_name,0, -1);
     wz_create_layout_stop(gui, -1);
 
     return gui;
@@ -200,7 +201,7 @@ WZ_WIDGET *create_settings_gui(Board *b){
     int lh=3;
     WZ_WIDGET *wgt, *gui = new_widget(GUI_SETTINGS,(b->xsize-gui_w)/2, (b->ysize-gui_h)/2, NULL);
     
-    wz_create_fill_layout(gui, 0, 0, gui_w, fsize*lh, fsize, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, -1);
+    wgt = (WZ_WIDGET*) wz_create_fill_layout(gui, 0, 0, gui_w, fsize*lh, fsize, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, -1);
     wz_create_textbox(gui, 0, 0, fsize*7, fsize*1.5, WZ_ALIGN_RIGHT, WZ_ALIGN_CENTRE, al_ustr_new("IRC Server:"),1, -1);
     wz_create_editbox(gui, 0, 0, gui_w/2.5, fsize*1.5, al_ustr_dup(b->server), 1, EDITBOX_SERVER);
     wz_create_textbox(gui, 0, 0, fsize*1, fsize*1.5, WZ_ALIGN_RIGHT, WZ_ALIGN_CENTRE, al_ustr_new(":"),1, -1);
