@@ -26,5 +26,4 @@ void emit_data_event(int event, intptr_t d1, intptr_t d2, intptr_t d3, intptr_t 
 int IRC_connect(const char *server, int port, const char *nick, const char *channel);
 char *strdup(const char *s);
 
-
 #endif

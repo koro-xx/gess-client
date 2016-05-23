@@ -35,6 +35,8 @@ enum { // gui elements
     GUI_CONFIRM_EXIT,
     GUI_CONFIRM_DISCONNECT,
     GUI_MESSAGE,
+    GUI_MATCH,
+    GUI_MATCH_INCOMING,
     BUTTON_OK,
     BUTTON_CANCEL,
     BUTTON_COLOR,
@@ -48,10 +50,12 @@ enum { // gui elements
     BUTTON_UNDO,
     BUTTON_QUIT,
     BUTTON_RESET,
+    BUTTON_MATCH,
     EDITBOX_SERVER,
     EDITBOX_PORT,
     EDITBOX_CHANNEL,
     EDITBOX_NICK,
+    EDITBOX_MATCH,
 };
 
 enum { // status
@@ -113,14 +117,14 @@ typedef struct Board {
     int draw_last; // draw last move?
     int allow_move;
     int board_input; // allow board input?
-    
+    int game_state;
+
     // fonts
     ALLEGRO_FONT *font; // fixed with please!
     int fsize;
     
     // irc stuff
     ALLEGRO_USTR *opponent;
-    int game_state;
     ALLEGRO_USTR *server;
     ALLEGRO_USTR *channel;
     int port;

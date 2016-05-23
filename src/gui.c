@@ -63,7 +63,7 @@ WZ_WIDGET* init_gui(int x, int y, int w, int h, WZ_THEME *theme){
 WZ_WIDGET* create_action_gui_2(WZ_WIDGET* parent, Board *b, int x, int y, int w){
     //xxx assume that screen is wider than taller for now
     int fsize = b->fsize;
-    int butn=5;
+    int butn=6;
     
     WZ_WIDGET *wgt, *gui = wz_create_widget(0, x, y, GUI_ACTION_2);
     gui->w = w; gui->h = 2.5*fsize*butn+fsize;
@@ -75,6 +75,7 @@ WZ_WIDGET* create_action_gui_2(WZ_WIDGET* parent, Board *b, int x, int y, int w)
 
 //    wz_create_button(gui, 0, 0, fsize*7, fsize*1.5, b->irc_status_msg, 0, BUTTON_CONNECT);
     wz_create_button(gui, 0, 0, fsize*8, fsize*1.5, al_ustr_new("Seek game"), 1, BUTTON_SEEK);
+    wz_create_button(gui, 0, 0, fsize*8, fsize*1.5, al_ustr_new("Match player"), 1, BUTTON_MATCH);
     wz_create_button(gui, 0, 0, fsize*8, fsize*1.5, al_ustr_new("Flip board"), 1, BUTTON_FLIP);
     wz_create_button(gui, 0, 0, fsize*8, fsize*1.5, al_ustr_new("Reset board"), 1, BUTTON_RESET);
     wz_create_button(gui, 0, 0, fsize*8, fsize*1.5, al_ustr_new("Quit"), 1, BUTTON_QUIT);
@@ -194,6 +195,40 @@ void apply_settings_gui(Board *b, WZ_WIDGET *gui){
     }
 }
 
+int apply_match_gui(Board *b, WZ_WIDGET *gui){
+    WZ_WIDGET *wgt = gui->first_child;
+    if(!wgt) return 0;
+    
+    while(wgt->next_sib && wgt->next_sib->id != EDITBOX_MATCH)
+        wgt = wgt->next_sib;
+    
+    if(al_ustr_length(((WZ_EDITBOX*)wgt)->text) == 0)
+        return 0;
+    
+    al_ustr_assign(b->opponent, ((WZ_EDITBOX*)wgt)->text);
+    return 1;    
+}
+
+
+WZ_WIDGET *create_match_gui(Board *b){
+    int w = b->size/3;
+    int fsize = b->fsize;
+    int h = fsize*6;
+    WZ_WIDGET *wgt, *gui = new_widget(GUI_MATCH, b->x+(b->size-(w+2*b->tsize))/2, b->y+(b->size - h - 2*b->tsize)/2, NULL);
+    
+    wz_create_fill_layout(gui, 0, 0, w+2*b->tsize, fsize*6, b->tsize, fsize, WZ_ALIGN_CENTRE, WZ_ALIGN_TOP, -1);
+    wz_create_textbox(gui, 0, 0, w, fsize, WZ_ALIGN_CENTRE, WZ_ALIGN_TOP, al_ustr_new("Match player (nickname):"), 1, -1);
+    wz_create_editbox(gui, 0, 0, w*0.8, fsize*1.5, al_ustr_new(""), 1, EDITBOX_MATCH);
+    
+    wz_create_fill_layout(gui, 0, fsize*6, w+2*b->tsize, 2*b->tsize, b->tsize, fsize, WZ_ALIGN_CENTRE, WZ_ALIGN_CENTRE, -1);
+    
+    wz_create_button(gui, 0, 0, fsize*4, fsize*1.5, al_ustr_new("OK"), 1, BUTTON_OK);
+    wgt = (WZ_WIDGET *) wz_create_button(gui, 0, 0, fsize*4, fsize*1.5, al_ustr_new("Cancel"), 1, BUTTON_CANCEL);
+    wz_set_shortcut(wgt, ALLEGRO_KEY_ESCAPE, 0);
+    
+    return gui;
+}
+    
 WZ_WIDGET *create_settings_gui(Board *b){
     int gui_w = b->xsize*0.7;
     int gui_h = b->ysize*0.8;

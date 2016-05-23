@@ -131,7 +131,7 @@ void init_board(Board *b){
     b->server = al_ustr_new("irc.freenode.org");
     b->nick = al_ustr_newf("gess%d", rand()%10000);
     b->port = 6667;
-    b->channel = al_ustr_new("#lalala");
+    b->channel = al_ustr_new("#gess");
     b->connected = 0;
     b->allow_move = 1;
     b->chat_term = term_create(80, 24);
@@ -218,6 +218,15 @@ void execute_undo(Game *g, Board *b){
     g->moves--;
     swap_turn(g, b);
 }
+
+void match_nick(Board *b, ALLEGRO_USTR *nick){
+    char msg[10];
+    sprintf(msg, ":seek %1d", b->request_player);
+    send_privmsg(b, al_cstr(nick), msg);
+
+    return;
+}
+
 
 void gui_handler(Board *b, Game *g, ALLEGRO_EVENT *ev, ALLEGRO_EVENT_QUEUE *queue){
     WZ_WIDGET* wgt = (WZ_WIDGET *)ev->user.data2;
@@ -306,6 +315,13 @@ void gui_handler(Board *b, Game *g, ALLEGRO_EVENT *ev, ALLEGRO_EVENT_QUEUE *queu
                     case BUTTON_SEEK:
                         seek_game(g, b, queue);
                         break;
+                    case BUTTON_MATCH:
+                        if(b->connected <= 0)
+                              add_gui(b->gui, queue, create_msg_gui(b, GUI_MESSAGE, al_ustr_new("Must be connected.")), 1);
+                        else
+                            add_gui(b->gui, queue, create_match_gui(b), 1);
+                        break;
+
                     case BUTTON_FLIP:
                         flip_board(b);
                         break;
@@ -332,6 +348,34 @@ void gui_handler(Board *b, Game *g, ALLEGRO_EVENT *ev, ALLEGRO_EVENT_QUEUE *queu
             }
             break;
         }
+        case GUI_MATCH:
+        {
+            if(ev->type == WZ_BUTTON_PRESSED)
+            {
+                if(ev->user.data1 == BUTTON_CANCEL)
+                {
+                    remove_gui(wgt->parent, 1);
+                }
+                else
+                {
+                    if(apply_match_gui(b, wgt->parent))
+                        match_nick(b, b->opponent);
+                    
+                    remove_gui(wgt->parent, 1);
+                }
+            }
+            break;
+        }
+        case GUI_MATCH_INCOMING:
+        {
+            char foo[20];
+            if(ev->type == WZ_BUTTON_PRESSED && ev->user.data1 == BUTTON_OK){
+                sscanf(al_cstr(((WZ_TEXTBOX*)wgt->parent->first_child)->text), "Incoming match request from <%9s>. Accept?", foo);
+                b->opponent = al_ustr_new(foo);
+                //xxx todo: now create a match (make the match handling separate!)
+            }
+        }
+
         case GUI_CONFIRM_EXIT:
         {
             if(ev->type == WZ_BUTTON_PRESSED)
@@ -609,7 +653,8 @@ void enter_move(Game *g, Board *b){
 
 
 
-void process_irc_event(Game *g, Board *b, int type, ALLEGRO_USER_EVENT *ev)
+
+void process_irc_event(Game *g, Board *b, int type, ALLEGRO_USER_EVENT *ev, ALLEGRO_EVENT_QUEUE *queue)
 {
     char *origin, *msg; // we should free these
     
@@ -621,7 +666,11 @@ void process_irc_event(Game *g, Board *b, int type, ALLEGRO_USER_EVENT *ev)
     
     if(type == EVENT_PRIVMSG_RECEIVED)
     {
-        if(b->game_state == GAME_SEEKING)
+        if(strncmp(msg, ":seek", 5)>0){
+            //xxx todo: fix incoming opponent name handling
+            add_gui(b->gui, queue, create_yesno_gui(b, GUI_MATCH_INCOMING, al_ustr_newf("Incoming match request from <%s>. Accept? (note: this feature is incomplete. Use Seek instead.", origin)), 1);
+        }
+        else if(b->game_state == GAME_SEEKING)
         {
             if(!strcasecmp(msg, ":ACK seek"))
             {
@@ -934,7 +983,7 @@ RESTART:
                     
                 case EVENT_PRIVMSG_RECEIVED:
                 case EVENT_CHANMSG_RECEIVED:
-                    process_irc_event(&g, &b, ev.type, &ev.user);
+                    process_irc_event(&g, &b, ev.type, &ev.user, event_queue);
                     redraw=1;
                     break;
                     
