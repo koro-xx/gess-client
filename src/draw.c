@@ -17,16 +17,38 @@ ALLEGRO_COLOR MOVE_COLOR[4] = {{0,0,0,0}, {0.2,0.2,0,0.2}, {0.2,0,0,0.2}, {0.2,0
 
 void redraw_turn_buttons(Board *b, int w, int h){
     ALLEGRO_BITMAP *target =al_get_target_bitmap();
-    ndestroy_bitmap(b->bmp_turn1);
-    ndestroy_bitmap(b->bmp_turn2);
-    b->bmp_turn1=al_create_bitmap(w,h);
-    al_set_target_bitmap(b->bmp_turn1);
+    ALLEGRO_BITMAP *parent, *bmp;
+    
+    bmp = al_create_bitmap(w,h);
+    al_set_target_bitmap(bmp);
     al_clear_to_color(TURN_COLOR);
+    if(b->bmp_turn1)
+    {
+        parent = al_get_parent_bitmap(b->bmp_turn1);
+        al_reparent_bitmap(b->bmp_turn1, bmp, 0,0,w,h);
+        al_destroy_bitmap(parent);
 
-    b->bmp_turn2=al_create_bitmap(w,h);
-    al_set_target_bitmap(b->bmp_turn2);
+    }
+    else
+    {
+        b->bmp_turn1 = al_create_sub_bitmap(bmp, 0,0, w,h);
+    }
+    
+    
+    bmp = al_create_bitmap(w,h);
+    al_set_target_bitmap(bmp);
     al_clear_to_color(NULL_COLOR);
-
+    if(b->bmp_turn2)
+    {
+        parent = al_get_parent_bitmap(b->bmp_turn2);
+        al_reparent_bitmap(b->bmp_turn2, bmp, 0,0,w,h);
+        al_destroy_bitmap(parent);
+    }
+    else
+    {
+        b->bmp_turn2 = al_create_sub_bitmap(bmp, 0,0,w,h);
+    }
+    
     al_set_target_bitmap(target);
     
 }
@@ -174,14 +196,6 @@ void draw_last_move(Game *g, Board *b)
 }
 
 
-void draw_gui_list(WZ_WIDGET_LIST *gui_l){
-    
-    if(gui_l->next)
-        draw_gui_list(gui_l->next);
-    
-    wz_draw(gui_l->wgt);
-}
-
 
 // main draw routine
 void draw_stuff(Game *g, Board *b){
@@ -244,7 +258,8 @@ void draw_stuff(Game *g, Board *b){
     //xxx todo: fix
     if((g->moves > 0) && b->draw_last) draw_last_move(g,b);
     
-    draw_gui_list(b->gui);
+    wz_draw(b->gui);
+//    draw_gui_list(b->gui);
 
     // guis
     

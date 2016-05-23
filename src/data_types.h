@@ -21,15 +21,17 @@
 #define EVENT_CHANMSG_RECEIVED (BASE_USER_EVENT_TYPE + 11)
 #define EVENT_IRC_DISCONNECT (BASE_USER_EVENT_TYPE + 12)
 
-#define MIN_PANEL_PORTION 0.2
-#define MAX_PANEL_PORTION 0.25
+#define PANEL_PORTION 0.30
+#define PANEL_SPACE 0.01
+//#define MAX_PANEL_PORTION 0.25
 
 enum { // gui elements
     GUI_NULL,
     GUI_INFO,
     GUI_SETTINGS,
     GUI_CHAT,
-    GUI_ACTION,
+    GUI_ACTION_1,
+    GUI_ACTION_2,
     GUI_CONFIRM_EXIT,
     GUI_CONFIRM_DISCONNECT,
     GUI_MESSAGE,
@@ -84,12 +86,6 @@ typedef struct Game {
     char (*history)[5];
 } Game;
 
-typedef struct WZ_WIDGET_LIST {
-    WZ_WIDGET *wgt;
-    
-    struct WZ_WIDGET_LIST *next;
-} WZ_WIDGET_LIST;
-
 typedef struct Board {
     // screen
     int xsize;
@@ -140,21 +136,19 @@ typedef struct Board {
     
     // guis | todo: make one big gui (whole screen) and destroy/create other guis as widgets
     struct WZ_WIDGET* i_gui;
+    int panel_width;
     
     //  extra displayed guis (in stack order)
-    WZ_WIDGET_LIST *gui;
+    WZ_WIDGET *gui;
     
     WZ_THEME* theme;
     // info gui helper
-    ALLEGRO_USTR *s_player1_name;
-    ALLEGRO_USTR *s_player2_name;
     
-    // settings gui helper (move all settings to a signle struct later!)
-    ALLEGRO_USTR *s_server;
-    ALLEGRO_USTR *s_port;
-    ALLEGRO_USTR *s_channel;
-    ALLEGRO_USTR *s_nick;
-    ALLEGRO_USTR *s_color;
+    ALLEGRO_USTR *player1_name;
+    ALLEGRO_USTR *player2_name;
+    ALLEGRO_USTR *player1_mark;
+    ALLEGRO_USTR *player2_mark;
+    
     
     ALLEGRO_BITMAP *bmp_turn1;
     ALLEGRO_BITMAP *bmp_turn2;
