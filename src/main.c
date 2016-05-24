@@ -227,7 +227,6 @@ void match_nick(Board *b, ALLEGRO_USTR *nick){
     return;
 }
 
-
 void gui_handler(Board *b, Game *g, ALLEGRO_EVENT *ev, ALLEGRO_EVENT_QUEUE *queue){
     WZ_WIDGET* wgt = (WZ_WIDGET *)ev->user.data2;
     if(!wgt->parent) return; // just in case
@@ -489,7 +488,7 @@ void resize_all(Board *b, Game *g){
     destroy_board(b);
     create_board(b, g);
     factor = b->size/((float) osize);
-    resize_wz_widget(b->gui, factor);
+    wz_resize(b->gui, factor); //resize_wz_widget(b->gui, factor);
 }
 
 
@@ -652,7 +651,12 @@ void enter_move(Game *g, Board *b){
 }
 
 
-
+// create a match struct. pass it as event on restart
+//typedef struct Match {
+//    ALLEGRO_USTR *opponent;
+//    int player;
+//    int type;
+//} Match;
 
 void process_irc_event(Game *g, Board *b, int type, ALLEGRO_USER_EVENT *ev, ALLEGRO_EVENT_QUEUE *queue)
 {
@@ -913,14 +917,14 @@ RESTART:
         dt = al_get_time() - old_time;
         old_time = al_get_time();
 
-        if(resized){
-            if(b.gui->first_child == b.gui->last_child)
-            {
-                destroy_base_gui(&b);
-                create_base_gui(&b, &g, event_queue);
-                resized = 0;
-            }
-        }
+//        if(resized){
+//            if(b.gui->first_child == b.gui->last_child)
+//            {
+//                destroy_base_gui(&b);
+//                create_base_gui(&b, &g, event_queue);
+//                resized = 0;
+//            }
+//        }
         
         wz_update(b.gui, fixed_dt);
 

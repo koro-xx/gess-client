@@ -380,6 +380,21 @@ void wz_destroy(WZ_WIDGET* wgt)
 }
 
 /*
+ Function: wz_resize
+ 
+ Resizes the widget tree. 
+ 
+ Parameters:
+ factor: scaling factor
+ */
+void wz_resize(WZ_WIDGET* wgt, float factor)
+{
+    ALLEGRO_EVENT event;
+    wz_craft_event(&event, WZ_RESIZE, 0, *(intptr_t*)&factor);
+    wz_broadcast_event(wgt, &event);
+}
+
+/*
 Function: wz_enable
 
 Enables/disables the widget tree

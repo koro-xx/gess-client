@@ -123,9 +123,9 @@ WZ_WIDGET* create_info_gui(Board *b, Game *g){
     
     b->player1_wgt = (WZ_WIDGET*)wz_create_fill_layout(gui, 0, gui_h-3*fsize, gui_w, 3*fsize, fsize/2, fsize/3, WZ_ALIGN_CENTRE, WZ_ALIGN_BOTTOM, -1);
     
-    wz_create_textbox(gui, 0, 0, gui_w-fsize, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, b->player1_name,0, -1);
+    wgt = (WZ_WIDGET *) wz_create_textbox(gui, 0, 0, gui_w-fsize, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, b->player1_name,0, -1);
     wz_create_layout_stop(gui, -1);
-
+    
     return gui;
 }
 
