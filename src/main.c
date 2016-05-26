@@ -298,7 +298,6 @@ void gui_handler(Board *b, Game *g, ALLEGRO_EVENT *ev, ALLEGRO_EVENT_QUEUE *queu
             
             case BUTTON_CHAT:
                 add_gui(b->gui, queue, create_term_gui(b, b->chat_term, GUI_CHAT),1);
-                hilight_chat_button(b, 0);
                 break;
                 
             case BUTTON_UNDO:
@@ -350,6 +349,7 @@ void gui_handler(Board *b, Game *g, ALLEGRO_EVENT *ev, ALLEGRO_EVENT_QUEUE *queu
             } else if(ev->type == WZ_BUTTON_PRESSED){
                 if(ev->user.data1 == BUTTON_CANCEL){
                     remove_gui(wgt->parent, 1);
+                    hilight_chat_button(b, 0);
                 }
             }
             break;
@@ -384,6 +384,7 @@ void gui_handler(Board *b, Game *g, ALLEGRO_EVENT *ev, ALLEGRO_EVENT_QUEUE *queu
                     reject_match(b);
                 remove_gui(wgt->parent, 1);
             }
+            break;
         }
 
         case GUI_CONFIRM_EXIT:
