@@ -28,6 +28,7 @@
 enum { // gui elements
     GUI_NULL,
     GUI_INFO,
+    GUI_IRC,
     GUI_SETTINGS,
     GUI_CHAT,
     GUI_ACTION_1,

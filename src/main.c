@@ -339,15 +339,6 @@ void gui_handler(Board *b, Game *g, ALLEGRO_EVENT *ev, ALLEGRO_EVENT_QUEUE *queu
             }
             break;
         }
-        case GUI_ACTION_1:
-        {
-            if(ev->type == WZ_BUTTON_PRESSED && ev->user.data1 == BUTTON_ACTION)
-            {
-                        add_gui(wgt->parent->parent, queue, create_action_gui_2(NULL, b, wgt->parent->x, wgt->parent->y, wgt->parent->w), 0);
-                        remove_gui(wgt->parent, 0);
-            }
-            break;
-        }
         case GUI_CHAT:
         {
             if(ev->type == WZ_TEXT_CHANGED){
@@ -360,15 +351,6 @@ void gui_handler(Board *b, Game *g, ALLEGRO_EVENT *ev, ALLEGRO_EVENT_QUEUE *queu
                 if(ev->user.data1 == BUTTON_CANCEL){
                     remove_gui(wgt->parent, 1);
                 }
-            }
-            break;
-        }
-        case GUI_ACTION_2:
-        {
-            if(ev->type == WZ_BUTTON_PRESSED && ev->user.data1 == BUTTON_CANCEL)
-            {
-                add_gui(wgt->parent->parent, queue, create_action_gui_1(NULL, b, wgt->parent->x, wgt->parent->y, wgt->parent->w),0);
-                remove_gui(wgt->parent, 0);
             }
             break;
         }
@@ -430,6 +412,24 @@ void gui_handler(Board *b, Game *g, ALLEGRO_EVENT *ev, ALLEGRO_EVENT_QUEUE *queu
             if(ev->type == WZ_BUTTON_PRESSED)
                 remove_gui(wgt->parent,1);
         }
+//        case GUI_ACTION_1:
+//        {
+//            if(ev->type == WZ_BUTTON_PRESSED && ev->user.data1 == BUTTON_ACTION)
+//            {
+//                add_gui(wgt->parent->parent, queue, create_action_gui_2(NULL, b, wgt->parent->x, wgt->parent->y, wgt->parent->w), 0);
+//                remove_gui(wgt->parent, 0);
+//            }
+//            break;
+//        }
+//        case GUI_ACTION_2:
+//        {
+//            if(ev->type == WZ_BUTTON_PRESSED && ev->user.data1 == BUTTON_CANCEL)
+//            {
+//                add_gui(wgt->parent->parent, queue, create_action_gui_1(NULL, b, wgt->parent->x, wgt->parent->y, wgt->parent->w),0);
+//                remove_gui(wgt->parent, 0);
+//            }
+//            break;
+//        }
     }
 }
 
@@ -1031,6 +1031,7 @@ RESTART:
                         b.focus_board = 0;
                     } else {
                         b.focus_board = 1;
+                        wz_focus(b.gui, 0);
                     }
                     redraw=1;
                     break;
@@ -1064,10 +1065,12 @@ RESTART:
                             if(b.focus_board)
                             {
                                 b.focus_board=0;
+                                wz_focus(b.gui, 1);
                                 b.fi=-1;
                                 b.fj=-1;
                             }
                             else{
+                                wz_focus(b.gui, 0);
                                 b.focus_board=1;
                                 b.fi =19;
                                 b.fj =19;

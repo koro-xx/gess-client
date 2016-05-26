@@ -83,18 +83,45 @@ WZ_WIDGET* create_action_gui_2(WZ_WIDGET* parent, Board *b, int x, int y, int w)
     return gui;
 }
 
+WZ_WIDGET* create_irc_gui(WZ_WIDGET* parent, Board *b, int x, int y, int w){
+    //xxx assume that screen is wider than taller for now
+    int fsize = b->fsize;
+    int butn=5;
+    
+    WZ_WIDGET *gui = wz_create_widget(0, x, y, GUI_IRC);
+    gui->w = w; gui->h = butn*fsize*2+fsize/2 + 3.5*fsize + 2;
+ 
+    wz_create_fill_layout(gui, 0, 0, gui->w, 3.5*fsize, fsize/2, fsize/2, WZ_ALIGN_CENTRE, WZ_ALIGN_TOP, -1);
+    wz_create_textbox(gui, 0, 0, gui->w-fsize, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, b->server, 0, -1);
+    wz_create_textbox(gui, 0, 0, al_get_text_width(b->font, "Nick:"), fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, al_ustr_new("Nick:"), 1, -1);
+    wz_create_textbox(gui, 0, 0, gui->w-al_get_text_width(b->font, "Nick:")-fsize-fsize/2, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, b->nick, 0, -1);
+    
+    wz_create_fill_layout(gui, 0, 3.5*fsize +2, gui->w, butn*2*fsize + fsize/2, fsize/2, fsize/2, WZ_ALIGN_CENTRE, WZ_ALIGN_TOP, -1);
+    
+    wz_create_button(gui, 0, 0, fsize*8, fsize*1.5, al_ustr_new("Settings"), 1, BUTTON_SETTINGS);
+    wz_create_button(gui, 0, 0, fsize*8, fsize*1.5, b->irc_status_msg, 0, BUTTON_IRC_STATUS);
+    wz_create_button(gui, 0, 0, fsize*8, fsize*1.5, al_ustr_new("Seek game"), 1, BUTTON_SEEK);
+    wz_create_button(gui, 0, 0, fsize*8, fsize*1.5, al_ustr_new("Match player"), 1, BUTTON_MATCH);
+    b->chat_button = (WZ_WIDGET*)wz_create_button(gui, 0, 0, fsize*8, fsize*1.5, al_ustr_new("Chat"), 1, BUTTON_CHAT);
+
+    if(parent) wz_attach(gui, parent);
+    return gui;
+}
+
 WZ_WIDGET* create_action_gui_1(WZ_WIDGET* parent, Board *b, int x, int y, int w){
     //xxx assume that screen is wider than taller for now
     int fsize = b->fsize;
-    int butn=3;
+    int butn=4;
     
     WZ_WIDGET *gui = wz_create_widget(0, x, y, GUI_ACTION_1);
-    gui->w = w; gui->h = butn*fsize*2.5+fsize;
+    gui->w = w; gui->h = butn*fsize*2+fsize/2;
 
-    wz_create_fill_layout(gui, 0, 0, w, gui->h, (w-fsize*8)/2.1, fsize, WZ_ALIGN_CENTRE, WZ_ALIGN_TOP, -1);
+    wz_create_fill_layout(gui, 0, 0, w, gui->h, (w-fsize*8)/2.1, fsize/2, WZ_ALIGN_CENTRE, WZ_ALIGN_TOP, -1);
     //xxx todo: move chat + settings to irc widget. Set it as widget.
-    wz_create_button(gui, 0, 0, fsize*8, fsize*1.5, al_ustr_new("Settings"), 1, BUTTON_SETTINGS);
-    wz_create_button(gui, 0, 0, fsize*8, fsize*1.5, al_ustr_new("Show more"), 1, BUTTON_ACTION);
+//    wz_create_button(gui, 0, 0, fsize*8, fsize*1.5, al_ustr_new("Show more"), 1, BUTTON_ACTION);
+    wz_create_button(gui, 0, 0, fsize*8, fsize*1.5, al_ustr_new("Flip board"), 1, BUTTON_FLIP);
+    wz_create_button(gui, 0, 0, fsize*8, fsize*1.5, al_ustr_new("Reset board"), 1, BUTTON_RESET);
+    wz_create_button(gui, 0, 0, fsize*8, fsize*1.5, al_ustr_new("Quit"), 1, BUTTON_QUIT);
     wz_create_button(gui, 0, 0, fsize*8, fsize*1.5, al_ustr_new("Undo"), 1, BUTTON_UNDO);
     if(parent) wz_attach(gui, parent);
     return gui;
@@ -102,30 +129,36 @@ WZ_WIDGET* create_action_gui_1(WZ_WIDGET* parent, Board *b, int x, int y, int w)
 
 WZ_WIDGET* create_info_gui(Board *b, Game *g){
     //xxx assume that screen is wider than taller for now
-    int gui_w = b->panel_width;
-    int gui_h = b->size;
     int fsize = b->fsize;
     WZ_WIDGET *wgt, *gui = new_widget(GUI_INFO, b->x+b->size + PANEL_SPACE*b->size, b->y, NULL);
+    gui->w = b->panel_width;
+    gui->h = b->size;
+    float pos;
     
-    b->player2_wgt = (WZ_WIDGET*)wz_create_fill_layout(gui, 0, 0, gui_w, 3*fsize, fsize/2, fsize/3, WZ_ALIGN_CENTRE, WZ_ALIGN_TOP, -1);
-    
-    wz_create_textbox(gui, 0, 0, gui_w-fsize, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, b->player2_name,0, -1);
-    
-    wz_create_fill_layout(gui, 0, 3*fsize+2, gui_w, 9.5*fsize, fsize/2, fsize/2, WZ_ALIGN_CENTRE, WZ_ALIGN_TOP, -1);
-    wz_create_textbox(gui, 0, 0, gui_w-fsize, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, b->server, 0, -1);
-    wz_create_textbox(gui, 0, 0, al_get_text_width(b->font, "Nick:"), fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, al_ustr_new("Nick:"), 1, -1);
-    wz_create_textbox(gui, 0, 0, gui_w-al_get_text_width(b->font, "Nick:")-fsize-fsize/2, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, b->nick, 0, -1);
-    wz_create_button(gui, 0, 0, fsize*8, fsize*1.5, b->irc_status_msg, 0, BUTTON_IRC_STATUS);
-    wz_create_button(gui, 0, 0, fsize*8, fsize*1.5, al_ustr_new("Seek game"), 1, BUTTON_SEEK);
-    b->chat_button = (WZ_WIDGET*)wz_create_button(gui, 0, 0, fsize*8, fsize*1.5, al_ustr_new("Chat"), 1, BUTTON_CHAT);
-    
+    b->player2_wgt = (WZ_WIDGET*)wz_create_fill_layout(gui, 0, 0, gui->w, 3*fsize, fsize/2, fsize/3, WZ_ALIGN_CENTRE, WZ_ALIGN_TOP, -1);
+    wz_create_textbox(gui, 0, 0, gui->w-fsize, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, b->player2_name,0, -1);
     wz_create_layout_stop(gui, -1);
+    pos=3*fsize + 2;
     
-    create_action_gui_1(gui, b, 0, fsize*12.5+4, gui_w);
+    wgt = (WZ_WIDGET*)create_irc_gui(gui, b, 0, pos, gui->w);
+//    wz_create_fill_layout(gui, 0, 3*fsize+2, gui->w, 13.5*fsize, fsize/2, fsize/2, WZ_ALIGN_CENTRE, WZ_ALIGN_TOP, -1);
+//    wz_create_textbox(gui, 0, 0, gui->w-fsize, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, b->server, 0, -1);
+//    wz_create_textbox(gui, 0, 0, al_get_text_width(b->font, "Nick:"), fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, al_ustr_new("Nick:"), 1, -1);
+//    wz_create_textbox(gui, 0, 0, gui->w-al_get_text_width(b->font, "Nick:")-fsize-fsize/2, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, b->nick, 0, -1);
+//    wz_create_button(gui, 0, 0, fsize*8, fsize*1.5, al_ustr_new("Settings"), 1, BUTTON_SETTINGS);
+//    wz_create_button(gui, 0, 0, fsize*8, fsize*1.5, b->irc_status_msg, 0, BUTTON_IRC_STATUS);
+//    wz_create_button(gui, 0, 0, fsize*8, fsize*1.5, al_ustr_new("Seek game"), 1, BUTTON_SEEK);
+//    wz_create_button(gui, 0, 0, fsize*8, fsize*1.5, al_ustr_new("Match player"), 1, BUTTON_MATCH);
+//    b->chat_button = (WZ_WIDGET*)wz_create_button(gui, 0, 0, fsize*8, fsize*1.5, al_ustr_new("Chat"), 1, BUTTON_CHAT);
+//    
+//    wz_create_layout_stop(gui, -1);
     
-    b->player1_wgt = (WZ_WIDGET*)wz_create_fill_layout(gui, 0, gui_h-3*fsize, gui_w, 3*fsize, fsize/2, fsize/3, WZ_ALIGN_CENTRE, WZ_ALIGN_BOTTOM, -1);
+    pos += wgt->h + 2;
+    create_action_gui_1(gui, b, 0, pos , gui->w);
     
-    wgt = (WZ_WIDGET *) wz_create_textbox(gui, 0, 0, gui_w-fsize, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, b->player1_name,0, -1);
+    b->player1_wgt = (WZ_WIDGET*)wz_create_fill_layout(gui, 0, gui->h-3*fsize, gui->w, 3*fsize, fsize/2, fsize/3, WZ_ALIGN_CENTRE, WZ_ALIGN_BOTTOM, -1);
+    
+    wz_create_textbox(gui, 0, 0, gui->w-fsize, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, b->player1_name,0, -1);
     wz_create_layout_stop(gui, -1);
     
     return gui;
