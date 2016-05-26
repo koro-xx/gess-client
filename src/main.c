@@ -46,7 +46,7 @@ Todo:
 
 ALLEGRO_EVENT_SOURCE user_event_src;
 
-float RESIZE_DELAY = 0.04;
+float RESIZE_DELAY = 1.0/FPS;
 float fixed_dt = 1.0/FPS;
 
 int desktop_xsize, desktop_ysize;
@@ -951,9 +951,6 @@ RESTART:
     
     g.turn = 1;
     b.lock = 0;
-
-    // temp
-    //add_gui(b.gui, event_queue, b.i_gui);
     
     if(b.game_state == GAME_PLAYING_IRC)
     {
@@ -966,15 +963,6 @@ RESTART:
         al_rest(fixed_dt - dt); //rest at least fixed_dt
         dt = al_get_time() - old_time;
         old_time = al_get_time();
-
-//        if(resized){
-//            if(b.gui->first_child == b.gui->last_child)
-//            {
-//                destroy_base_gui(&b);
-//                create_base_gui(&b, &g, event_queue);
-//                resized = 0;
-//            }
-//        }
         
         wz_update(b.gui, fixed_dt);
 
@@ -1051,7 +1039,6 @@ RESTART:
                     
                 case ALLEGRO_EVENT_KEY_CHAR:
                     keypress=1;
-                    //xxx todo: check this part. board input not working
                     if(b.gui->first_child && (b.gui->first_child == b.gui->last_child))
                     {
                         if(ev.keyboard.keycode == ALLEGRO_KEY_ESCAPE)
@@ -1081,12 +1068,6 @@ RESTART:
                     if (b.focus_board)
                     {
                         switch(ev.keyboard.keycode){
-//     xxx todo: add clean up before restart
-//                            case ALLEGRO_KEY_R:
-//                                 restart=1;
-//                                 goto RESTART;
-//                                 break;
-//
                             case ALLEGRO_KEY_BACKSPACE:
                                 execute_undo(&g, &b);
                                 redraw=1;
@@ -1108,17 +1089,10 @@ RESTART:
                                 redraw=1;
                                 break;
                             case ALLEGRO_KEY_ENTER:
+                            case ALLEGRO_KEY_SPACE:
                                 emit_event(ALLEGRO_EVENT_MOUSE_BUTTON_DOWN);
                                 break;
-                                
-                            case ALLEGRO_KEY_1:
-                                try_irc_connect(&b);
-                                break;
-                            
-                            case ALLEGRO_KEY_2:
-                                seek_game(&g, &b, event_queue);
-                                break;
-                                
+    
                             default:
                                 if((ev.keyboard.unichar>= 'a') && (ev.keyboard.unichar <= 't')){
                                     if(type_coords == 0){
@@ -1139,8 +1113,7 @@ RESTART:
                     }
                     break;
                 case ALLEGRO_EVENT_DISPLAY_RESIZE:
-                    if (fullscreen) break;
-                    al_acknowledge_resize(display);
+                    if (fullscreen || resizing) break;
                     resizing=1; resize_time=al_get_time();
                     break;
                 case EVENT_REDRAW:
@@ -1168,7 +1141,7 @@ RESTART:
 // android workaround, try removing:
 //            al_clear_to_color(BLACK_COLOR);
 //            al_flip_display();
-            continue;
+//            continue;
         }
         
         if(resizing) // skip redraw and other stuff
