@@ -14,8 +14,6 @@
 #define TERM_LINE_SIZE 512
 
 typedef struct Terminal{
-/* dimensions */
-    int w, h;
 /* keep 128 lines, max 512 bytes each, cyclic buffer
  * initialize to null */
     char *line[MAX_TERM_LINES];
@@ -31,11 +29,12 @@ typedef struct Terminal{
     int input;
 } Terminal;
 
+void term_draw(Terminal *t, float x, float y, float w, float h, ALLEGRO_FONT *font, ALLEGRO_COLOR fg_color, ALLEGRO_COLOR bg_color);
 
-void term_draw(Terminal *t, int x, int y, ALLEGRO_FONT *font, ALLEGRO_COLOR fg_color, ALLEGRO_COLOR bg_color);
+//void term_draw(Terminal *t, int x, int y, ALLEGRO_FONT *font, ALLEGRO_COLOR fg_color, ALLEGRO_COLOR bg_color);
 int term_add_line(Terminal *t, const char *str);
 void term_destroy(Terminal *t);
-Terminal *term_create(int w, int h);
+Terminal *term_create(void);
 
 
 #endif /* defined(__gess__terminal__) */

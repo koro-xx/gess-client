@@ -139,7 +139,9 @@ typedef struct Board {
     int focus_board;
     
     // guis | todo: make one big gui (whole screen) and destroy/create other guis as widgets
-    struct WZ_WIDGET* i_gui;
+    WZ_WIDGET* i_gui;
+    WZ_WIDGET* chat_button;
+    int chat_waiting;
     int panel_width;
     
     //  extra displayed guis (in stack order)
@@ -154,9 +156,10 @@ typedef struct Board {
     WZ_WIDGET *player1_wgt;
     WZ_WIDGET *player2_wgt;
     
+    int new_player; // what player I will be in next game
+    int new_game_type; // game mode
+    ALLEGRO_USTR *new_opponent; // opponent name in next game
     
-    ALLEGRO_BITMAP *bmp_turn1;
-    ALLEGRO_BITMAP *bmp_turn2;
 } Board;
 
 

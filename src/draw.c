@@ -15,43 +15,6 @@
 ALLEGRO_COLOR MOVE_COLOR[4] = {{0,0,0,0}, {0.2,0.2,0,0.2}, {0.2,0,0,0.2}, {0.2,0,0,0.2}};
 
 
-void redraw_turn_buttons(Board *b, int w, int h){
-    ALLEGRO_BITMAP *target =al_get_target_bitmap();
-    ALLEGRO_BITMAP *parent, *bmp;
-    
-    bmp = al_create_bitmap(w,h);
-    al_set_target_bitmap(bmp);
-    al_clear_to_color(TURN_COLOR);
-    if(b->bmp_turn1)
-    {
-        parent = al_get_parent_bitmap(b->bmp_turn1);
-        al_reparent_bitmap(b->bmp_turn1, bmp, 0,0,w,h);
-        al_destroy_bitmap(parent);
-
-    }
-    else
-    {
-        b->bmp_turn1 = al_create_sub_bitmap(bmp, 0,0, w,h);
-    }
-    
-    
-    bmp = al_create_bitmap(w,h);
-    al_set_target_bitmap(bmp);
-    al_clear_to_color(NULL_COLOR);
-    if(b->bmp_turn2)
-    {
-        parent = al_get_parent_bitmap(b->bmp_turn2);
-        al_reparent_bitmap(b->bmp_turn2, bmp, 0,0,w,h);
-        al_destroy_bitmap(parent);
-    }
-    else
-    {
-        b->bmp_turn2 = al_create_sub_bitmap(bmp, 0,0,w,h);
-    }
-    
-    al_set_target_bitmap(target);
-    
-}
 
 void draw_tile_rectangle(Board *b, int i, int j, int w, int h, ALLEGRO_COLOR color, int stroke){
     if(b->pov == 2){
@@ -259,12 +222,44 @@ void draw_stuff(Game *g, Board *b){
     if((g->moves > 0) && b->draw_last) draw_last_move(g,b);
     
     wz_draw(b->gui);
-//    draw_gui_list(b->gui);
-
-    // guis
-    
-//        if(((WZ_WIDGET*)b->gui[i])->id == GUI_CHAT){
-//            term_draw(b->chat_term, ((WZ_WIDGET*)b->gui[i])->x+2, ((WZ_WIDGET*)b->gui[i])->y+2, b->font, WHITE_COLOR, BLACK_COLOR);
-//        }
 }
+
+/* for wz_theme
+static void my_draw_rectangle(float x1, float y1, float x2, float y2, float border, ALLEGRO_COLOR col, bool invert)
+{
+    if(invert)
+        al_draw_filled_rectangle(x1+border/2, y1+border/2, x2+border/2, y2+border/2, col);
+    else
+        al_draw_rectangle(x1+border/2, y1+border/2, x2+border/2, y2+border/2, col, border);
+}
+
+void my_draw_button(WZ_THEME* theme, float x, float y, float w, float h, ALLEGRO_USTR* text, int style)
+{
+    WZ_DEF_THEME* thm = (WZ_DEF_THEME*)theme;
+    ALLEGRO_COLOR button_col;
+    ALLEGRO_COLOR text_col;
+    bool invert = false;
+    button_col = thm->color1;
+    text_col = thm->color2;
+    
+    if(style & WZ_STYLE_FOCUSED)
+    {
+        button_col = wz_scale_color(thm->color1, 1.25);
+    }
+    
+    if(style & WZ_STYLE_DISABLED)
+    {
+        button_col = wz_scale_color(thm->color1, 0.5);
+        text_col = wz_scale_color(thm->color2, 0.5);
+    }
+    
+    if(style & WZ_STYLE_DOWN)
+    {
+        invert = true;
+    }
+    
+    my_draw_rectangle(x, y, x + w, y + h, 2, button_col, invert);
+    wz_draw_multi_text(x, y, w, h, WZ_ALIGN_CENTRE, WZ_ALIGN_CENTRE, text_col, thm->font, text);
+}
+*/
 

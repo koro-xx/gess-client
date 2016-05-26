@@ -113,9 +113,22 @@ void irc_disconnect_request(Board *b){
     irc_disconnect(g_irc_s);
     b->connected = 0;
     b->game_type = MODE_SAME_DEVICE;
+    b->game_state = GAME_PLAYING;
+    al_ustr_assign_cstr(b->opponent, "Player 2");
     al_ustr_assign_cstr(b->irc_status_msg, "Connect");
 }
 
+void hilight_chat_button(Board *b, int state)
+{
+    if(state){
+        b->chat_waiting = 1;
+        wz_set_theme(b->chat_button, b->theme_alt);
+    } else
+    {
+        b->chat_waiting = 0;
+        wz_set_theme(b->chat_button, b->theme);
+    }
+}
 
 void init_board(Board *b){
 
@@ -134,15 +147,17 @@ void init_board(Board *b){
     b->channel = al_ustr_new("#gess");
     b->connected = 0;
     b->allow_move = 1;
-    b->chat_term = term_create(80, 24);
+    b->chat_term = term_create();
     b->opponent = al_ustr_new("");
     b->irc_status_msg = al_ustr_new("Connect");
     b->request_player = 0;
+    b->new_opponent = NULL;
     
     b->player1_name = al_ustr_new("Player 1");
     b->player2_name = al_ustr_new("Player 2");
     b->gui = NULL;
-    
+    b->chat_button = NULL;
+    b->chat_waiting = 0;
     b->game_type = MODE_SAME_DEVICE;
     b->focus_board=1;
 }
@@ -181,6 +196,8 @@ void seek_game(Game *g, Board *b, ALLEGRO_EVENT_QUEUE *queue)
     sprintf(foo, "seek %1d", b->request_player);
     irc_cmd_msg(g_irc_s, al_cstr(b->channel), foo);
     b->game_state = GAME_SEEKING;
+    if(b->new_opponent) al_ustr_free(b->new_opponent);
+    b->new_opponent = NULL;
 }
 
 void flip_board(Board *b){
@@ -204,8 +221,6 @@ void flip_board(Board *b){
 void set_pov(Board *b, int pov){
     if(pov == b->pov)
         return;
-       
-    b->pov = pov;
     flip_board(b);
 }
 
@@ -219,17 +234,82 @@ void execute_undo(Game *g, Board *b){
     swap_turn(g, b);
 }
 
-void match_nick(Board *b, ALLEGRO_USTR *nick){
+void reject_match(Board *b){
+    al_ustr_free(b->opponent);
+    b->opponent = NULL;
+    send_privmsg(b, al_cstr(b->new_opponent), ":REJECT");
+}
+
+void request_match(Board *b){
+    //xxx todo: check for existing opponent
     char msg[10];
     sprintf(msg, ":seek %1d", b->request_player);
-    send_privmsg(b, al_cstr(nick), msg);
+    send_privmsg(b, al_cstr(b->new_opponent), msg);
+    
+    b->game_state = GAME_SEEKING;
+    b->new_player = b->request_player;
+}
 
-    return;
+void ack_seek(Board *b){
+    send_privmsg(b, al_cstr(b->new_opponent), ":ACK seek");
 }
 
 void gui_handler(Board *b, Game *g, ALLEGRO_EVENT *ev, ALLEGRO_EVENT_QUEUE *queue){
     WZ_WIDGET* wgt = (WZ_WIDGET *)ev->user.data2;
     if(!wgt->parent) return; // just in case
+    
+    if(ev->type == WZ_BUTTON_PRESSED)
+    {
+        switch(wgt->id)
+        {
+            case BUTTON_SEEK:
+                seek_game(g, b, queue);
+                break;
+
+            case BUTTON_MATCH:
+                if(b->connected <= 0)
+                    add_gui(b->gui, queue, create_msg_gui(b, GUI_MESSAGE, al_ustr_new("Must be connected.")), 1);
+                else
+                    add_gui(b->gui, queue, create_match_gui(b), 1);
+                break;
+
+            case BUTTON_FLIP:
+                flip_board(b);
+                break;
+
+            case BUTTON_RESET:
+                if(b->game_state == GAME_PLAYING_IRC)
+                    add_gui(b->gui, queue, create_msg_gui(b, -1, al_ustr_new("Cannot do that while playing online")),1);
+                else
+                    emit_event(EVENT_RESTART);
+                break;
+
+            case BUTTON_QUIT:
+                add_gui(b->gui, queue, create_yesno_gui(b, GUI_CONFIRM_EXIT, al_ustr_new("Exit application?")),1);
+                break;
+                
+            case BUTTON_IRC_STATUS:
+            case BUTTON_CONNECT:
+                if(b->connected)
+                    add_gui(b->gui, queue, create_yesno_gui(b, GUI_CONFIRM_DISCONNECT, al_ustr_new("Disconnect from IRC server?")), 1);
+                else
+                    try_irc_connect(b);
+                break;
+            
+            case BUTTON_CHAT:
+                add_gui(b->gui, queue, create_term_gui(b, b->chat_term, GUI_CHAT),1);
+                hilight_chat_button(b, 0);
+                break;
+                
+            case BUTTON_UNDO:
+                execute_undo(g, b);
+                break;
+                
+            case BUTTON_SETTINGS:
+                add_gui(b->gui, queue, create_settings_gui(b), 1);
+                break;
+        }
+    }
     
     switch(wgt->parent->id)
     {
@@ -259,36 +339,12 @@ void gui_handler(Board *b, Game *g, ALLEGRO_EVENT *ev, ALLEGRO_EVENT_QUEUE *queu
             }
             break;
         }
-        case GUI_INFO:
-        {
-            if(ev->type == WZ_BUTTON_PRESSED){
-                if(wgt->id == BUTTON_IRC_STATUS) {
-                    if(b->connected)
-                        add_gui(b->gui, queue, create_yesno_gui(b, GUI_CONFIRM_DISCONNECT, al_ustr_new("Disconnect from IRC server?")), 1);
-                    else
-                        try_irc_connect(b);
-                }
-            }
-            break;
-        }
         case GUI_ACTION_1:
         {
-            if(ev->type == WZ_BUTTON_PRESSED){
-                switch(ev->user.data1){
-                    case BUTTON_SETTINGS:
-                        add_gui(b->gui, queue, create_settings_gui(b), 1);
-                        break;
-                    case BUTTON_CHAT:
-                        add_gui(b->gui, queue, create_term_gui(b, b->chat_term, GUI_CHAT),1);
-                        break;
-                    case BUTTON_ACTION:
+            if(ev->type == WZ_BUTTON_PRESSED && ev->user.data1 == BUTTON_ACTION)
+            {
                         add_gui(wgt->parent->parent, queue, create_action_gui_2(NULL, b, wgt->parent->x, wgt->parent->y, wgt->parent->w), 0);
                         remove_gui(wgt->parent, 0);
-                        break;
-                    case BUTTON_UNDO:
-                        execute_undo(g, b);
-                        break;
-                }
             }
             break;
         }
@@ -309,41 +365,10 @@ void gui_handler(Board *b, Game *g, ALLEGRO_EVENT *ev, ALLEGRO_EVENT_QUEUE *queu
         }
         case GUI_ACTION_2:
         {
-            if(ev->type == WZ_BUTTON_PRESSED){
-                switch(ev->user.data1){
-                    case BUTTON_SEEK:
-                        seek_game(g, b, queue);
-                        break;
-                    case BUTTON_MATCH:
-                        if(b->connected <= 0)
-                              add_gui(b->gui, queue, create_msg_gui(b, GUI_MESSAGE, al_ustr_new("Must be connected.")), 1);
-                        else
-                            add_gui(b->gui, queue, create_match_gui(b), 1);
-                        break;
-
-                    case BUTTON_FLIP:
-                        flip_board(b);
-                        break;
-//                    case BUTTON_CONNECT:
-//                        if(b->connected)
-//                            add_gui(b->gui, queue, create_yesno_gui(b, GUI_CONFIRM_DISCONNECT, al_ustr_new("Disconnect from IRC server?")));
-//                        else
-//                            try_irc_connect(b);
-//                        break;
-                    case BUTTON_RESET:
-                        if(b->game_state == GAME_PLAYING_IRC)
-                            add_gui(b->gui, queue, create_msg_gui(b, -1, al_ustr_new("Cannot do that while playing online")),1);
-                            else
-                                emit_event(EVENT_RESTART);
-                        break;
-                    case BUTTON_QUIT:
-                         add_gui(b->gui, queue, create_yesno_gui(b, GUI_CONFIRM_EXIT, al_ustr_new("Exit application?")),1);
-                        break;
-                    case BUTTON_CANCEL:
-                        add_gui(wgt->parent->parent, queue, create_action_gui_1(NULL, b, wgt->parent->x, wgt->parent->y, wgt->parent->w),0);
-                        remove_gui(wgt->parent, 0);
-                        break;
-                }
+            if(ev->type == WZ_BUTTON_PRESSED && ev->user.data1 == BUTTON_CANCEL)
+            {
+                add_gui(wgt->parent->parent, queue, create_action_gui_1(NULL, b, wgt->parent->x, wgt->parent->y, wgt->parent->w),0);
+                remove_gui(wgt->parent, 0);
             }
             break;
         }
@@ -355,11 +380,13 @@ void gui_handler(Board *b, Game *g, ALLEGRO_EVENT *ev, ALLEGRO_EVENT_QUEUE *queu
                 {
                     remove_gui(wgt->parent, 1);
                 }
-                else
+                else if(ev->user.data1 == BUTTON_OK)
                 {
                     if(apply_match_gui(b, wgt->parent))
-                        match_nick(b, b->opponent);
-                    
+                    {
+                        request_match(b);
+                        add_gui(b->gui, queue, create_msg_gui(b, GUI_MESSAGE, al_ustr_newf("Request sent to %s.", al_cstr(b->new_opponent))),1);
+                    }
                     remove_gui(wgt->parent, 1);
                 }
             }
@@ -367,11 +394,13 @@ void gui_handler(Board *b, Game *g, ALLEGRO_EVENT *ev, ALLEGRO_EVENT_QUEUE *queu
         }
         case GUI_MATCH_INCOMING:
         {
-            char foo[20];
-            if(ev->type == WZ_BUTTON_PRESSED && ev->user.data1 == BUTTON_OK){
-                sscanf(al_cstr(((WZ_TEXTBOX*)wgt->parent->first_child)->text), "Incoming match request from <%9s>. Accept?", foo);
-                b->opponent = al_ustr_new(foo);
-                //xxx todo: now create a match (make the match handling separate!)
+            if(ev->type == WZ_BUTTON_PRESSED)
+            {
+                if(ev->user.data1 == BUTTON_OK)
+                    ack_seek(b);
+                else if(ev->user.data1 == BUTTON_CANCEL)
+                    reject_match(b);
+                remove_gui(wgt->parent, 1);
             }
         }
 
@@ -404,33 +433,6 @@ void gui_handler(Board *b, Game *g, ALLEGRO_EVENT *ev, ALLEGRO_EVENT_QUEUE *queu
     }
 }
 
-
-
-//
-//void create_board(Board *b, Game *g){
-//    ALLEGRO_BITMAP *target = al_get_target_bitmap();
-//    int size;
-//    b->xsize = al_get_bitmap_width(al_get_target_bitmap());
-//    b->ysize = al_get_bitmap_height(al_get_target_bitmap());
-//    size = min(b->xsize/(1.0+PANEL_PORTION+PANEL_SPACE), b->ysize);
-//    b->tsize = size/20;
-//    b->size = b->tsize*20;
-//    b->panel_width = PANEL_PORTION*b->size;
-//    b->x=0;
-//    b->y=0;
-//    b->pr = b->tsize * 0.45;
-//    b->board_bmp = al_create_bitmap(b->size,b->size);
-//    al_set_target_bitmap(b->board_bmp);
-//    al_clear_to_color(NULL_COLOR);
-//    draw_board(b);
-//    al_set_target_bitmap(target);
-//    b->board_input = 1;
-//    b->fsize = b->tsize*0.5;
-//    b->font = load_font_mem(text_font_mem, TEXT_FONT_FILE, -b->fsize);
-//    init_theme(b);
-//    b->gui = init_gui(b->x, b->y, b->size*(1.0+PANEL_PORTION + PANEL_SPACE), b->size, b->theme);
-//    b->i_gui = create_info_gui(b, g);
-//}
 
 void create_base_gui(Board *b, Game *g, ALLEGRO_EVENT_QUEUE *queue){
     if(!b->gui){
@@ -651,12 +653,14 @@ void enter_move(Game *g, Board *b){
 }
 
 
+
 // create a match struct. pass it as event on restart
 //typedef struct Match {
 //    ALLEGRO_USTR *opponent;
 //    int player;
 //    int type;
 //} Match;
+
 
 void process_irc_event(Game *g, Board *b, int type, ALLEGRO_USER_EVENT *ev, ALLEGRO_EVENT_QUEUE *queue)
 {
@@ -668,112 +672,155 @@ void process_irc_event(Game *g, Board *b, int type, ALLEGRO_USER_EVENT *ev, ALLE
     deblog("RECEIVED: %s | %s", origin, msg);
     chat_term_add_line(b->chat_term, origin, msg);
     
-    if(type == EVENT_PRIVMSG_RECEIVED)
+    switch(type)
     {
-        if(strncmp(msg, ":seek", 5)>0){
-            //xxx todo: fix incoming opponent name handling
-            add_gui(b->gui, queue, create_yesno_gui(b, GUI_MATCH_INCOMING, al_ustr_newf("Incoming match request from <%s>. Accept? (note: this feature is incomplete. Use Seek instead.", origin)), 1);
-        }
-        else if(b->game_state == GAME_SEEKING)
+        case EVENT_PRIVMSG_RECEIVED:
         {
-            if(!strcasecmp(msg, ":ACK seek"))
+            if(msg[0] != ':')
             {
-                b->game_state = GAME_PLAYING_IRC;
-                b->player =  b->request_player ? b->request_player : ((rand()%2)+1);
+                hilight_chat_button(b,1);
+                break;
             }
-            else if (!strcasecmp(msg, ":P1"))
+            if(!strncmp(msg, ":seek", 5))
             {
-                b->game_state = GAME_PLAYING_IRC;
-                b->player = 2;
-            }
-            else if(!strcasecmp(msg, ":P2"))
-            {
-                b->game_state = GAME_PLAYING_IRC;
-                b->player = 1;
-            }
-            
-            if(b->game_state == GAME_PLAYING_IRC)
-            {
-                al_ustr_assign_cstr(b->opponent, origin);
-                if(b->player == 1){
-                    al_ustr_assign(b->player1_name, b->nick);
-                    al_ustr_assign(b->player2_name, b->opponent);
-                } else {
-                    al_ustr_assign(b->player1_name, b->opponent);
-                    al_ustr_assign(b->player2_name, b->nick);
+                if((b->game_state == GAME_PLAYING_IRC) || b->new_opponent)
+                {
+                    send_privmsg(b, origin, ":BUSY");
+                    break;
                 }
+            
+                if(sscanf(msg, ":seek %d", &b->new_player) == 0)
+                    b->new_player = 0;
                 
-                set_pov(b, b->player);
-                b->game_state = GAME_PLAYING_IRC;
-                b->allow_move = (b->player == 1) ? 1 : 0;
-                send_privmsg(b, al_cstr(b->opponent), (b->player == 1) ? ":P1" : ":P2"); // tell: i am player 2
+                if((b->new_player <= 0) || (b->new_player > 2))
+                    b->new_player = 0;
+                else
+                    b->new_player = 3-b->new_player;
+                
+                b->new_opponent = al_ustr_new(origin);
+                
+                if(b->game_state == GAME_SEEKING) {
+                    if(!b->player || b->player == b->new_player)
+                        ack_seek(b);
+                } else {
+                    add_gui(b->gui, queue, create_yesno_gui(b, GUI_MATCH_INCOMING, al_ustr_newf("Incoming match request from <%s>. Accept?", origin)), 1);
+                }
+            }
+            else if(!strcasecmp(msg, ":ACK seek"))
+            {
+                if((b->game_state == GAME_PLAYING_IRC) || (b->new_opponent && strcmp(al_cstr(b->new_opponent), origin)) )
+                {
+                    send_privmsg(b, origin, ":BUSY");
+                    break;
+                }
+
+                if(!b->new_opponent) b->new_opponent = al_ustr_new(origin);
+                b->new_player =  b->request_player ? b->request_player : ((rand()%2)+1);
+                b->new_game_type = MODE_ONLINE;
                 emit_event(EVENT_RESTART);
             }
-            
-// xxx todo: log chat message into chat console.
-//            else
-//            {
-//                chat_msg_add(origin, msg);
-//            }
-        }
-        else if((b->game_state == GAME_PLAYING_IRC) && (g->turn != b->player)) // turn=2 instead?
-        {
-            if(!strcmp(origin, al_cstr(b->opponent)))
-            {
-                char op_move_str[5];
-                int op_moves;
-                if(sscanf(msg, ":%d,%4s", &op_moves, op_move_str) == 2) // move was made
+            else if(b->new_opponent && !strcmp(al_cstr(b->new_opponent), origin))
+            { //xxx todo: just in case need to check incoming match accepted here
+                if (!strcasecmp(msg, ":P1"))                {
+                    b->new_player = 2;
+                    b->new_game_type = MODE_ONLINE;
+                    emit_event(EVENT_RESTART);
+                }
+                else if(!strcasecmp(msg, ":P2"))
                 {
-                    if(op_moves!= g->moves + 1){
-                        send_privmsg(b, al_cstr(b->opponent), "SYNC problem. This is not the move I'm waiting.");
-                    }
-                    else if(!str_is_move(op_move_str))
+                    b->new_player = 1;
+                    b->new_game_type = MODE_ONLINE;
+                    emit_event(EVENT_RESTART);
+                }
+                
+                // xxx todo: log chat message into chat console.
+                //            else
+                //            {
+                //                chat_msg_add(origin, msg);
+                //            }
+            }
+            else if((b->game_state == GAME_PLAYING_IRC) && (g->turn != b->player)) // turn=2 instead?
+            {
+                if(!strcmp(origin, al_cstr(b->opponent)))
+                {
+                    char op_move_str[5];
+                    int op_moves;
+                    if(sscanf(msg, ":%d,%4s", &op_moves, op_move_str) == 2) // move was made
                     {
-                        send_privmsg(b, al_cstr(b->opponent), "Invalid move. Send again.");
-                    }
-                    else
-                    {
-                        int i, j, ii, jj;
-                        str_to_coords(op_move_str, &i, &j, &ii, &jj);
-                        
-                        if(is_block_movable(g, i, j) && try_lock(g, b, i, j) && try_move(g, b,  ii, jj))
+                        if(op_moves!= g->moves + 1){
+                            send_privmsg(b, al_cstr(b->opponent), "SYNC problem. This is not the move I'm waiting.");
+                        }
+                        else if(!str_is_move(op_move_str))
                         {
-                            acknowledge_privmsg(b, al_cstr(b->opponent), msg);
-                            b->allow_move = 1;
+                            send_privmsg(b, al_cstr(b->opponent), "Invalid move. Send again.");
                         }
                         else
                         {
-                            unlock_block(g, b);
-                            send_privmsg(b, al_cstr(b->opponent), "Invalid move. Send again.");
+                            int i, j, ii, jj;
+                            str_to_coords(op_move_str, &i, &j, &ii, &jj);
+                            
+                            if(is_block_movable(g, i, j) && try_lock(g, b, i, j) && try_move(g, b,  ii, jj))
+                            {
+                                acknowledge_privmsg(b, al_cstr(b->opponent), msg);
+                                b->allow_move = 1;
+                            }
+                            else
+                            {
+                                unlock_block(g, b);
+                                send_privmsg(b, al_cstr(b->opponent), "Invalid move. Send again.");
+                            }
                         }
-                    }
-                } // else if (... other commands like undo, forefeit, adjourn, etc... )
-            }
-        }// xxx todo: remove this:
-        else if(b->game_state == GAME_WAITING_MOVE_ACK)
-        {
-            if((strstr(msg, ":ACK ,") == msg) && (!strcmp(msg+6,g->brd->last_move)))
+                    } // else if (... other commands like undo, forefeit, adjourn, etc... )
+                }
+            }// xxx todo: remove this:
+            else if(b->game_state == GAME_WAITING_MOVE_ACK)
             {
-                b->game_state = GAME_PLAYING_IRC;
+                if((strstr(msg, ":ACK ,") == msg) && (!strcmp(msg+6,g->brd->last_move)))
+                {
+                    b->game_state = GAME_PLAYING_IRC;
+                }
             }
+            break;
         }
-    }
-    else if(type == EVENT_CHANMSG_RECEIVED)
-    {
-        if(b->game_state == GAME_SEEKING)
+        case EVENT_CHANMSG_RECEIVED:
         {
-            if(strncmp(msg, ":seek", 5)>0)
+            if(b->game_state == GAME_SEEKING)
             {
-                send_privmsg(b, origin, ":ACK seek");
+                if(!strncmp(msg, "seek", 4))
+                {
+                    if(b->new_opponent) al_ustr_free(b->new_opponent);
+                    b->new_opponent = al_ustr_new(origin);
+                    send_privmsg(b, origin, ":ACK seek");
+                }
             }
+            break;
         }
     }
     
-        
     free(origin);
     free(msg);
 }
 
+void init_irc_game(Board *b, Game *g){
+    al_ustr_assign(b->opponent, b->new_opponent);
+    al_ustr_free(b->new_opponent);
+    b->new_opponent = NULL;
+    b->player = b->new_player;
+
+    //xxx todo: fix player switching on flip board (flip widgets instead?);
+    if(b->player == 1){
+        al_ustr_assign(b->player1_name, b->nick);
+        al_ustr_assign(b->player2_name, b->opponent);
+    } else {
+        al_ustr_assign(b->player1_name, b->opponent);
+        al_ustr_assign(b->player2_name, b->nick);
+    }
+
+    set_pov(b, b->player);
+    b->game_state = GAME_PLAYING_IRC;
+    b->allow_move = (b->player == 1) ? 1 : 0;
+    send_privmsg(b, al_cstr(b->opponent), (b->player == 1) ? ":P1" : ":P2"); // tell: i am player 2
+}
 
 int main(int argc, char **argv){
     ALLEGRO_EVENT ev;
@@ -879,7 +926,10 @@ RESTART:
     init_game(&g);
     create_board(&b, &g);
     create_base_gui(&b, &g, event_queue);
-    
+
+    if((b.new_game_type == MODE_ONLINE) && b.new_opponent)
+        init_irc_game(&b, &g);
+   
     al_set_target_backbuffer(display);
 
 //  initialize flags

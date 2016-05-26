@@ -3,8 +3,8 @@
 #include "draw.h"
 #include "allegro_stuff.h"
 
-#define GUI_BG_COLOR al_map_rgba_f(.4, .4, .4, 1)
-#define GUI_BG_COLOR_ALT al_map_rgba_f(.7, .7, .7, 1)
+#define GUI_BG_COLOR al_map_rgba_f(.3,.4,0.6,1) //al_map_rgba_f(.4, .4, .4, 1)
+#define GUI_BG_COLOR_ALT al_map_rgba_f(.7,.7,.4,1) //al_map_rgba_f(.7, .7, .7, 1)
 
 #define GUI_FG_COLOR al_map_rgba_f(1, 1, 1, 1)
 
@@ -36,6 +36,7 @@ void draw_GUI(WZ_WIDGET *gui){
 
 
 
+
 //// dirty hack to extend wz_widget (copying a wgt created by WidgetZ and freeing its memory by hand)
 //void GUI_init(GUI *gui, int id, int x, int y, WZ_THEME *theme){
 //    WZ_WIDGET *wgt;
@@ -63,7 +64,7 @@ WZ_WIDGET* init_gui(int x, int y, int w, int h, WZ_THEME *theme){
 WZ_WIDGET* create_action_gui_2(WZ_WIDGET* parent, Board *b, int x, int y, int w){
     //xxx assume that screen is wider than taller for now
     int fsize = b->fsize;
-    int butn=6;
+    int butn=5;
     
     WZ_WIDGET *wgt, *gui = wz_create_widget(0, x, y, GUI_ACTION_2);
     gui->w = w; gui->h = 2.5*fsize*butn+fsize;
@@ -74,7 +75,6 @@ WZ_WIDGET* create_action_gui_2(WZ_WIDGET* parent, Board *b, int x, int y, int w)
 //    wz_set_shortcut(wgt, ALLEGRO_KEY_ESCAPE, 0);
 
 //    wz_create_button(gui, 0, 0, fsize*7, fsize*1.5, b->irc_status_msg, 0, BUTTON_CONNECT);
-    wz_create_button(gui, 0, 0, fsize*8, fsize*1.5, al_ustr_new("Seek game"), 1, BUTTON_SEEK);
     wz_create_button(gui, 0, 0, fsize*8, fsize*1.5, al_ustr_new("Match player"), 1, BUTTON_MATCH);
     wz_create_button(gui, 0, 0, fsize*8, fsize*1.5, al_ustr_new("Flip board"), 1, BUTTON_FLIP);
     wz_create_button(gui, 0, 0, fsize*8, fsize*1.5, al_ustr_new("Reset board"), 1, BUTTON_RESET);
@@ -86,16 +86,15 @@ WZ_WIDGET* create_action_gui_2(WZ_WIDGET* parent, Board *b, int x, int y, int w)
 WZ_WIDGET* create_action_gui_1(WZ_WIDGET* parent, Board *b, int x, int y, int w){
     //xxx assume that screen is wider than taller for now
     int fsize = b->fsize;
-    int butn=4;
+    int butn=3;
     
     WZ_WIDGET *gui = wz_create_widget(0, x, y, GUI_ACTION_1);
     gui->w = w; gui->h = butn*fsize*2.5+fsize;
 
     wz_create_fill_layout(gui, 0, 0, w, gui->h, (w-fsize*8)/2.1, fsize, WZ_ALIGN_CENTRE, WZ_ALIGN_TOP, -1);
     //xxx todo: move chat + settings to irc widget. Set it as widget.
-    wz_create_button(gui, 0, 0, fsize*8, fsize*1.5, al_ustr_new("Show more"), 1, BUTTON_ACTION);
-    wz_create_button(gui, 0, 0, fsize*8, fsize*1.5, al_ustr_new("Chat"), 1, BUTTON_CHAT);
     wz_create_button(gui, 0, 0, fsize*8, fsize*1.5, al_ustr_new("Settings"), 1, BUTTON_SETTINGS);
+    wz_create_button(gui, 0, 0, fsize*8, fsize*1.5, al_ustr_new("Show more"), 1, BUTTON_ACTION);
     wz_create_button(gui, 0, 0, fsize*8, fsize*1.5, al_ustr_new("Undo"), 1, BUTTON_UNDO);
     if(parent) wz_attach(gui, parent);
     return gui;
@@ -112,14 +111,17 @@ WZ_WIDGET* create_info_gui(Board *b, Game *g){
     
     wz_create_textbox(gui, 0, 0, gui_w-fsize, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, b->player2_name,0, -1);
     
-    wz_create_fill_layout(gui, 0, 3*fsize, gui_w, 5*fsize, fsize/2, fsize/3, WZ_ALIGN_CENTRE, WZ_ALIGN_TOP, -1);
+    wz_create_fill_layout(gui, 0, 3*fsize+2, gui_w, 9.5*fsize, fsize/2, fsize/2, WZ_ALIGN_CENTRE, WZ_ALIGN_TOP, -1);
     wz_create_textbox(gui, 0, 0, gui_w-fsize, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, b->server, 0, -1);
     wz_create_textbox(gui, 0, 0, al_get_text_width(b->font, "Nick:"), fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, al_ustr_new("Nick:"), 1, -1);
     wz_create_textbox(gui, 0, 0, gui_w-al_get_text_width(b->font, "Nick:")-fsize-fsize/2, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, b->nick, 0, -1);
     wz_create_button(gui, 0, 0, fsize*8, fsize*1.5, b->irc_status_msg, 0, BUTTON_IRC_STATUS);
+    wz_create_button(gui, 0, 0, fsize*8, fsize*1.5, al_ustr_new("Seek game"), 1, BUTTON_SEEK);
+    b->chat_button = (WZ_WIDGET*)wz_create_button(gui, 0, 0, fsize*8, fsize*1.5, al_ustr_new("Chat"), 1, BUTTON_CHAT);
+    
     wz_create_layout_stop(gui, -1);
     
-   create_action_gui_1(gui, b, 0, fsize*8, gui_w);
+    create_action_gui_1(gui, b, 0, fsize*12.5+4, gui_w);
     
     b->player1_wgt = (WZ_WIDGET*)wz_create_fill_layout(gui, 0, gui_h-3*fsize, gui_w, 3*fsize, fsize/2, fsize/3, WZ_ALIGN_CENTRE, WZ_ALIGN_BOTTOM, -1);
     
@@ -199,13 +201,14 @@ int apply_match_gui(Board *b, WZ_WIDGET *gui){
     WZ_WIDGET *wgt = gui->first_child;
     if(!wgt) return 0;
     
-    while(wgt->next_sib && wgt->next_sib->id != EDITBOX_MATCH)
+    while(wgt->next_sib && wgt->id != EDITBOX_MATCH)
         wgt = wgt->next_sib;
     
     if(al_ustr_length(((WZ_EDITBOX*)wgt)->text) == 0)
         return 0;
     
-    al_ustr_assign(b->opponent, ((WZ_EDITBOX*)wgt)->text);
+    if(b->new_opponent) al_ustr_free(b->new_opponent);
+    b->new_opponent = al_ustr_dup(((WZ_EDITBOX*)wgt)->text);
     return 1;    
 }
 
@@ -230,11 +233,11 @@ WZ_WIDGET *create_match_gui(Board *b){
 }
     
 WZ_WIDGET *create_settings_gui(Board *b){
-    int gui_w = b->xsize*0.7;
-    int gui_h = b->ysize*0.8;
+    int gui_w = (b->size+b->panel_width)*0.7;
+    int gui_h = b->size*0.5;
     int fsize = b->tsize*0.6;
     int lh=3;
-    WZ_WIDGET *wgt, *gui = new_widget(GUI_SETTINGS,(b->xsize-gui_w)/2, (b->ysize-gui_h)/2, NULL);
+    WZ_WIDGET *wgt, *gui = new_widget(GUI_SETTINGS,b->x +(b->size+b->panel_width-gui_w)/2, b->y + (b->ysize-gui_h)/2, NULL);
     
     wgt = (WZ_WIDGET*) wz_create_fill_layout(gui, 0, 0, gui_w, fsize*lh, fsize, fsize, WZ_ALIGN_LEFT, WZ_ALIGN_CENTRE, -1);
     wz_create_textbox(gui, 0, 0, fsize*7, fsize*1.5, WZ_ALIGN_RIGHT, WZ_ALIGN_CENTRE, al_ustr_new("IRC Server:"),1, -1);
@@ -277,7 +280,7 @@ int wz_terminal_proc(WZ_WIDGET* wgt, const ALLEGRO_EVENT* event){
     }
     int ret = wz_widget_proc(wgt, event);
     if(event->type == WZ_DRAW){
-        term_draw(((WZ_TERMINAL *)wgt)->term, wgt->x, wgt->y, wgt->theme->get_font(wgt->theme, 1), WHITE_COLOR, BLACK_COLOR);
+        term_draw(((WZ_TERMINAL *)wgt)->term, wgt->x, wgt->y, wgt->w, wgt->h, wgt->theme->get_font(wgt->theme, 1), WHITE_COLOR, BLACK_COLOR);
     }
     return ret;
 }
@@ -296,10 +299,9 @@ WZ_WIDGET *wz_create_terminal(WZ_WIDGET *parent, int x, int y, int w, int h, Ter
 
 WZ_WIDGET* create_term_gui(Board *b, Terminal *term, int id){
     int fh = b->fsize;
-    int term_w = term->w*al_get_glyph_advance(b->font, '0', '0');
-    int term_h = term->h*fh;
+    int term_w = 80*al_get_glyph_advance(b->font, '0', '0');
+    int term_h = 24*fh;
     WZ_WIDGET *wgt, *gui = new_widget(GUI_CHAT, (b->size*(1+PANEL_PORTION+PANEL_SPACE)-term_w-4)/2, (b->size-term_h - 2*fh-4)/2, NULL);
-
     
     wgt = (WZ_WIDGET*) wz_create_box(gui, 0, 0, term_w+4, term_h+fh*1.5+4, -1);
     wgt->flags |= WZ_STATE_NOTWANT_FOCUS;

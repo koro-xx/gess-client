@@ -4,13 +4,11 @@
 #include "macros.h"
 #include <allegro5/allegro_primitives.h>
 
-Terminal *term_create(int w, int h){
+Terminal *term_create(void){
     Terminal *t = malloc(sizeof *t);
     
     memset(t, 0, sizeof(*t));
     t->pos = 0;
-    t->w = w;
-    t->h = h;
     t->cursor = 0;
     t->input = 0;
     return t;
@@ -92,57 +90,61 @@ void term_input(Terminal *t, int allegro_keycode, int *c){
 /* prints displayed part of terminal to a string and returns pointer to it */
 /* currently assumes terminal is at bottom */
 
-char *term_print_str(Terminal *t){
-    int th = t->input ? t->h-1 : t->h;
-    char *str = malloc((t->w+1)*th*sizeof(char));
-    memset(str, 0, (t->w+1)*(th - 1)*sizeof(char));
+char *term_print_str(Terminal *t, int tw, int th){
     int l = 1;
-    int sl= th-1;
+    int sl;
     int offset;
     char *line;
     int len;
+    char *str;
+    th = t->input ? th-1 : th;
+    sl = th-1;
+    
+    str = malloc((tw+1)*th*sizeof(char));
+    memset(str, 0, (tw+1)*(th - 1)*sizeof(char));
     
     do{
         line = t->line[nmod(t->pos-l, MAX_TERM_LINES)];
         if(!line){
-            memset(str, 0, t->w*sl);
+            memset(str, 0, tw*sl);
             break;
         }
         len=strlen(line);
-        offset = t->w * ((len-1)/t->w);
-        strncpy(str+t->w*sl, line + offset, t->w);
-        if(len % t->w) str[t->w*sl+len-offset] = 0; // add null terminating character if required
+        offset = tw * ((len-1)/tw);
+        strncpy(str+tw*sl, line + offset, tw);
+        if(len % tw) str[tw*sl+len-offset] = 0; // add null terminating character if required
         
         sl--;
-        offset -= t->w;
+        offset -= tw;
         while((offset>=0) && (sl >= 0)){
-            strncpy(str+t->w*sl, line + offset, t->w);
+            strncpy(str+tw*sl, line + offset, tw);
             sl--;
-            offset -= t->w;
+            offset -= tw;
         }
         l++;
     } while(sl>=0);
-    str[th*t->w] = 0; // final null character
+    str[th*tw] = 0; // final null character
     return str;
 }
 
-void term_draw(Terminal *t, int x, int y, ALLEGRO_FONT *font, ALLEGRO_COLOR fg_color, ALLEGRO_COLOR bg_color){
-    char *str = term_print_str(t);
-    char temp[t->w+1];
-    int i, th, shift;
+void term_draw(Terminal *t, float x, float y, float w, float h, ALLEGRO_FONT *font, ALLEGRO_COLOR fg_color, ALLEGRO_COLOR bg_color){
+    int i, shift;
+    int ch = al_get_font_line_height(font);
+    int cw = al_get_glyph_advance(font, '0', '0');
+    int tw = w/cw, th = h/ch;
+    char temp[tw+1];
+    char *str = term_print_str(t, tw, th);
+
+    al_draw_filled_rectangle(x,y, x + w, y + h, bg_color);
     
-    th = al_get_font_line_height(font);
-    
-    al_draw_filled_rectangle(x,y, x + t->w*al_get_glyph_advance(font, '0', '0'), y + t->h*th, bg_color);
-    
-    for(i=0; i<t->h-t->input;i++){
-        strncpy(temp, str+(t->w*i), t->w);
-        temp[t->w] = 0;
-        al_draw_text(font, fg_color, x, y + i*th, ALLEGRO_ALIGN_LEFT, temp);
+    for(i=0; i<th-t->input;i++){
+        strncpy(temp, str + tw*i, tw);
+        temp[tw] = 0;
+        al_draw_text(font, fg_color, x, y + i*ch, ALLEGRO_ALIGN_LEFT, temp);
     }
     
     if(t->input){
-        shift = (t->cursor-1)/t->w;
-        al_draw_text(font, fg_color, x, y+(t->h-1)*th, ALLEGRO_ALIGN_LEFT, t->buf+shift*t->w);
+        shift = (t->cursor-1)/tw;
+        al_draw_text(font, fg_color, x, y+(ch-1)*ch, ALLEGRO_ALIGN_LEFT, t->buf+shift*tw);
     }
 }
