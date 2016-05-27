@@ -3,7 +3,7 @@
 
 #include <allegro5/allegro.h>
 #include "terminal.h"
-#include "widgetz.h"
+#include "widgetz/widgetz.h"
 
 #define DEFAULT_FONT_FILE "fonts/fixed_font.tga"
 
