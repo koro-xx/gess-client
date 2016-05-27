@@ -111,13 +111,9 @@ int init_allegro(void){
 //    init_sound(); // I don't care if there was an error here.
 //    deblog("initialized sound");
 
-<<<<<<< HEAD
-//  al_init_image_addon();
-//  deblog("initialized image addon");
-=======
 //    al_init_image_addon();
 //    deblog("initialized image addon");
->>>>>>> 5437dd6b1467f825dc37af080dd94265b747f2fd
+    
     al_init_font_addon();
     deblog("initialized font addon");
     al_init_ttf_addon();
