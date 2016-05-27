@@ -81,7 +81,6 @@ void send_move(Game *g, Board *b){
     snprintf(move, 32, ":%d,%s", g->moves, g->brd->last_move);
 //    strcpy(move+1, g->brd->last_move);
     send_privmsg(b, al_cstr(b->opponent), move);
-    b->allow_move = 0;
 }
 
 void emit_data_event(int event, intptr_t d1, intptr_t d2, intptr_t d3, intptr_t d4){
@@ -159,6 +158,7 @@ void init_board(Board *b){
     b->chat_waiting = 0;
     b->game_type = MODE_SAME_DEVICE;
     b->focus_board=1;
+    b->request_undo=0;
 }
 
 void add_gui(WZ_WIDGET *base, ALLEGRO_EVENT_QUEUE *queue, WZ_WIDGET *gui, int stack){
@@ -180,6 +180,10 @@ void swap_turn(Game *g, Board *b)
 {
     g->turn = (g->turn == 1) ? 2 : 1;
     SWAP(b->player1_wgt->theme, b->player2_wgt->theme);
+    if(b->game_state == GAME_PLAYING_IRC && g->turn != b->player)
+        b->allow_move = 0;
+    else
+        b->allow_move = 1;
 }
 
 
@@ -224,13 +228,34 @@ void set_pov(Board *b, int pov){
 }
 
 void execute_undo(Game *g, Board *b){
-    if(b->game_state != GAME_PLAYING) return;
+    if((b->game_state != GAME_PLAYING) && (b->game_state != GAME_PLAYING_IRC)) return;
     if(!g->brd->parent) return;
     g->brd = g->brd->parent;
     free(g->brd->child);
     b->lock = 0;
     g->moves--;
     swap_turn(g, b);
+}
+
+void request_undo(Game *g, Board *b){
+    char msg[20];
+    
+    if(b->game_state != GAME_PLAYING_IRC)
+    {
+        execute_undo(g,b);
+        return;
+    }
+    
+    if(b->request_undo == g->moves || b->request_undo == g->moves - 1) return;
+    
+    if(g->moves == 0 || (g->moves == 1 && b->player == 2)) return;
+    if(g->turn == b->player)
+        b->request_undo = g->moves-1;
+    else
+        b->request_undo = g->moves;
+    
+    sprintf(msg, ":UNDO %d", b->request_undo);
+    send_privmsg(b, al_cstr(b->opponent), msg);
 }
 
 void reject_match(Board *b){
@@ -300,7 +325,7 @@ void gui_handler(Board *b, Game *g, ALLEGRO_EVENT *ev, ALLEGRO_EVENT_QUEUE *queu
                 break;
                 
             case BUTTON_UNDO:
-                execute_undo(g, b);
+                request_undo(g, b);
                 break;
                 
             case BUTTON_SETTINGS:
@@ -386,6 +411,21 @@ void gui_handler(Board *b, Game *g, ALLEGRO_EVENT *ev, ALLEGRO_EVENT_QUEUE *queu
             break;
         }
 
+        case GUI_UNDO_INCOMING:
+        {
+            if(ev->type == WZ_BUTTON_PRESSED)
+            {
+                if(ev->user.data1 == BUTTON_OK)
+                {
+                    send_privmsg(b, al_cstr(b->opponent), ":ACK UNDO");
+                    while(g->moves >= b->request_undo)
+                        execute_undo(g,b);
+                    b->request_undo = 0;
+                }
+                remove_gui(wgt->parent, 1);
+            }
+            break;
+        }
         case GUI_CONFIRM_EXIT:
         {
             if(ev->type == WZ_BUTTON_PRESSED)
@@ -435,6 +475,8 @@ void gui_handler(Board *b, Game *g, ALLEGRO_EVENT *ev, ALLEGRO_EVENT_QUEUE *queu
 
 
 void create_base_gui(Board *b, Game *g, ALLEGRO_EVENT_QUEUE *queue){
+    init_theme(b);
+
     if(!b->gui){
         b->gui = init_gui(b->x, b->y, b->size*(1.0+PANEL_PORTION + PANEL_SPACE), b->size, b->theme);
         add_gui(NULL, queue, b->gui, 0);
@@ -469,7 +511,6 @@ void create_board(Board *b, Game *g){
     b->board_input = 1;
     b->fsize = b->tsize*0.5;
     b->font = load_font_mem(text_font_mem, TEXT_FONT_FILE, -b->fsize);
-    init_theme(b);
 }
 
 void destroy_board(Board *b){
@@ -665,6 +706,7 @@ void enter_move(Game *g, Board *b){
 void process_irc_event(Game *g, Board *b, int type, ALLEGRO_USER_EVENT *ev, ALLEGRO_EVENT_QUEUE *queue)
 {
     char *origin, *msg; // we should free these
+    int undo;
     
     origin = (char*) ev->data1;
     msg = (char *) ev->data2;
@@ -739,6 +781,20 @@ void process_irc_event(Game *g, Board *b, int type, ALLEGRO_USER_EVENT *ev, ALLE
                 //                chat_msg_add(origin, msg);
                 //            }
             }
+            else if((b->game_state == GAME_PLAYING_IRC) && (sscanf(msg, ":UNDO %d", &undo) == 1))
+            {
+                if(g->moves != undo && g->moves != undo + 1) break;
+                b->request_undo = undo;
+                add_gui(b->gui, queue, create_yesno_gui(b, GUI_UNDO_INCOMING, al_ustr_newf("Request from %s to undo last move. Accept?", origin)), 1);
+                        break;
+            }
+            else if((b->game_state == GAME_PLAYING_IRC) && (!strcmp(msg, ":ACK UNDO")) && b->request_undo)
+            {
+                while(g->moves >= b->request_undo)
+                    execute_undo(g,b);
+                b->request_undo=0;
+                break;
+            }
             else if((b->game_state == GAME_PLAYING_IRC) && (g->turn != b->player)) // turn=2 instead?
             {
                 if(!strcmp(origin, al_cstr(b->opponent)))
@@ -762,7 +818,6 @@ void process_irc_event(Game *g, Board *b, int type, ALLEGRO_USER_EVENT *ev, ALLE
                             if(is_block_movable(g, i, j) && try_lock(g, b, i, j) && try_move(g, b,  ii, jj))
                             {
                                 acknowledge_privmsg(b, al_cstr(b->opponent), msg);
-                                b->allow_move = 1;
                             }
                             else
                             {

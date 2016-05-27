@@ -38,6 +38,7 @@ enum { // gui elements
     GUI_MESSAGE,
     GUI_MATCH,
     GUI_MATCH_INCOMING,
+    GUI_UNDO_INCOMING,
     BUTTON_OK,
     BUTTON_CANCEL,
     BUTTON_COLOR,
@@ -161,6 +162,7 @@ typedef struct Board {
     int new_game_type; // game mode
     ALLEGRO_USTR *new_opponent; // opponent name in next game
     
+    int request_undo;
 } Board;
 
 
