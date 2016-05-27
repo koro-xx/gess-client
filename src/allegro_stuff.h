@@ -22,7 +22,7 @@
 
 typedef struct MemFile{
     void *mem;
-    int64_t size;
+    size_t size;
 } MemFile;
 
 
