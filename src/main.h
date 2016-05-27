@@ -4,7 +4,7 @@
 /* Order of includes is important! */
 #include <libircclient.h>
 #include <allegro5/allegro.h>
-#include "widgetz.h"
+#include "widgetz/widgetz.h"
 #include "terminal.h"
 #include "data_types.h"
 #include "gui.h"

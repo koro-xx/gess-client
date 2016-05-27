@@ -35,7 +35,6 @@ Todo:
 #include "allegro_stuff.h"
 #include "main.h"
 #include <libircclient.h>
-#include "widgetz.h"
 #include "terminal.h"
 #include "draw.h"
 #include "game.h"
