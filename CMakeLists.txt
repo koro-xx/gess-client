@@ -10,12 +10,9 @@ include_directories(AFTER ${IRCCLIENT_INCLUDE_DIR})
 
 set(LINK_LIBRARIES ${LINK_LIBRARIES}
  	  Alleg::Allegro
-	  Alleg::Audio
-	  Alleg::Image
 	  Alleg::Font
 	  Alleg::TTF
 	  Alleg::Primitives
-	  Alleg::Acodec
 	  Alleg::Color
 	  Alleg::Memfile
 	  Alleg::Main
@@ -75,13 +72,11 @@ add_executable(gess MACOSX_BUNDLE ${APP_ICON} ${SOURCES} ${HEADERS} ${RESOURCES}
 
 target_link_libraries(gess ${LINK_LIBRARIES})
 
-IF(APPLE)
-	set_source_files_properties(${RESOURCES} PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
-ENDIF(APPLE)
-if (WIN32)
-	set_target_properties(gess PROPERTIES COMPILE_DEFINITIONS "_CRT_SECURE_NO_WARNINGS")
-endif(WIN32)
 
-if(UNIX)
-	file(COPY ${RESOURCES} DESTINATION .)
-endif(UNIX)
+if(APPLE)
+    set_source_files_properties(${RESOURCES} PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
+elseif(WIN32)
+    set_target_properties(watson PROPERTIES COMPILE_DEFINITIONS "_CRT_SECURE_NO_WARNINGS")
+elseif(UNIX)
+    file(COPY ${RESOURCES} DESTINATION .)
+endif(APPLE)
