@@ -24,4 +24,14 @@ First install Allegro 5 and libircclient, then run make from the gess-client dir
 
 There is no install rule. Just run the executable from the same dir.
 
+Alternatively, use cmake:
 
+	cd gess-client && mkdir build && cd build
+	cmake ..
+	make
+
+If Allegro or Ircclient are not found, you can add -DVAR=path when calling cmake, where VAR can be:
+
+	Alleg_ROOT: path to a dir containing include/allegro5 and lib/liballeg*
+	IRC_CLIENT_INCLUDE_DIR: path to a dir contianing the libircclient headers.
+	IRC_CLIENT_LIBRARY: path to the ircclient library (probably libircclient.so)
