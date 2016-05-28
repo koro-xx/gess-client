@@ -417,11 +417,16 @@ void gui_handler(Board *b, Game *g, ALLEGRO_EVENT *ev, ALLEGRO_EVENT_QUEUE *queu
             {
                 if(ev->user.data1 == BUTTON_OK)
                 {
+                    if(!b->request_undo) break;
                     send_privmsg(b, al_cstr(b->opponent), ":ACK UNDO");
                     while(g->moves >= b->request_undo)
                         execute_undo(g,b);
-                    b->request_undo = 0;
                 }
+                else
+                {
+                    send_privmsg(b, al_cstr(b->opponent), ":REJECT UNDO");
+                }
+                b->request_undo = 0;
                 remove_gui(wgt->parent, 1);
             }
             break;
@@ -687,6 +692,7 @@ void enter_move(Game *g, Board *b){
         if(try_move(g, b, b->fi, b->fj))
             if(b->game_state == GAME_PLAYING_IRC){
                 send_move(g, b);
+                b->request_undo=0;
             }
     } else {
         try_lock(g, b, b->fi, b->fj);
@@ -783,7 +789,11 @@ void process_irc_event(Game *g, Board *b, int type, ALLEGRO_USER_EVENT *ev, ALLE
             }
             else if((b->game_state == GAME_PLAYING_IRC) && (sscanf(msg, ":UNDO %d", &undo) == 1))
             {
-                if(g->moves != undo && g->moves != undo + 1) break;
+                if( (g->moves != undo && g->moves != undo + 1) || b->request_undo )
+                {
+                    send_privmsg(b, al_cstr(b->opponent), ":REJECT UNDO");
+                    break;
+                }
                 b->request_undo = undo;
                 add_gui(b->gui, queue, create_yesno_gui(b, GUI_UNDO_INCOMING, al_ustr_newf("Request from %s to undo last move. Accept?", origin)), 1);
                         break;
@@ -794,6 +804,10 @@ void process_irc_event(Game *g, Board *b, int type, ALLEGRO_USER_EVENT *ev, ALLE
                     execute_undo(g,b);
                 b->request_undo=0;
                 break;
+            }
+            else if((b->game_state == GAME_PLAYING_IRC) && (!strcmp(msg, ":REJECT UNDO")))
+            {
+                b->request_undo=0;
             }
             else if((b->game_state == GAME_PLAYING_IRC) && (g->turn != b->player)) // turn=2 instead?
             {
