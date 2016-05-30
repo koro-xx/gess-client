@@ -4,6 +4,16 @@
 #include "macros.h"
 #include <allegro5/allegro_primitives.h>
 
+char *my_strndup(const char *s, int len) {
+    size_t n = max(len, strlen(s) + 1);
+    char *d = malloc(n);   // Allocate memory
+    if (d != NULL) {
+        memcpy(d, s, n);         // Copy string if okay
+        d[n - 1] = 0;
+    }
+    return d;                            // Return new memory
+}
+
 Terminal *term_create(void){
     Terminal *t = malloc(sizeof *t);
     
@@ -24,7 +34,7 @@ int term_add_line(Terminal *t, const char *str){
     if(!str) return -1;
     
     if(t->line[t->pos]) nfree(t->line[t->pos]);
-    t->line[t->pos] = strndup(str, 511);
+    t->line[t->pos] = my_strndup(str, 511);
     t->pos = (t->pos + 1) % MAX_TERM_LINES;
     return 0;
 }
@@ -89,6 +99,7 @@ void term_input(Terminal *t, int allegro_keycode, int *c){
 
 /* prints displayed part of terminal to a string and returns pointer to it */
 /* currently assumes terminal is at bottom */
+
 
 char *term_print_str(Terminal *t, int tw, int th){
     int l = 1;

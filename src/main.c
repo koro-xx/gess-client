@@ -16,8 +16,12 @@ Todo:
 // add save/restore
 // add nick collision handling / reconnect / etc
 
-#ifdef _WIN32
+
+#ifdef _WIN32 // should define these things globally
     #define _CRT_SECURE_NO_WARNINGS
+// for libirccclient
+    #define WIN32
+    #define WIN32_LEAN_AND_MEAN
 #endif
 
 #include <stdio.h>
@@ -917,11 +921,11 @@ int main(int argc, char **argv){
    
     if (init_allegro()) return -1;
 
-#ifndef _WIN32
+//#ifndef _WIN32
      // use anti-aliasing if available (seems to cause problems in windows)
      al_set_new_display_option(ALLEGRO_SAMPLE_BUFFERS, 1, ALLEGRO_SUGGEST);
      al_set_new_display_option(ALLEGRO_SAMPLES, 8, ALLEGRO_SUGGEST);
-#endif
+//#endif
     
     fullscreen = 0;
     

@@ -24,6 +24,12 @@ typedef struct
 
 irc_ctx_t ctx;
 
+char *my_strdup(const char *s) {
+    char *d = malloc(strlen(s) + 1);   // Allocate memory
+    if (d != NULL) strcpy(d, s);         // Copy string if okay
+    return d;                            // Return new memory
+}
+
 
 void addlog (const char * fmt, ...)
 {
@@ -92,7 +98,7 @@ void event_privmsg (irc_session_t * session, const char * event, const char * or
 {
     dump_event (session, event, origin, params, count);
     
-    emit_data_event(EVENT_PRIVMSG_RECEIVED, (intptr_t) strdup(origin), (intptr_t) strdup(params[1]),  0, 0);
+    emit_data_event(EVENT_PRIVMSG_RECEIVED, (intptr_t) my_strdup(origin), (intptr_t) my_strdup(params[1]),  0, 0);
 }
 
 
@@ -105,7 +111,7 @@ void event_channel (irc_session_t * session, const char * event, const char * or
     dump_event (session, event, origin, params, count);
 
     if(!origin) return;
-    emit_data_event(EVENT_CHANMSG_RECEIVED, (intptr_t) strdup(origin), (intptr_t) strdup(params[1]), (intptr_t) strdup(params[0]), 0);
+    emit_data_event(EVENT_CHANMSG_RECEIVED, (intptr_t) my_strdup(origin), (intptr_t) my_strdup(params[1]), (intptr_t) my_strdup(params[0]), 0);
 }
 
 
@@ -203,8 +209,8 @@ int IRC_connect(const char *server, int port, const char *nick, const char *chan
         return 1;
     }
     
-    ctx.nick = strdup(nick);
-    ctx.channel = strdup(channel);
+    ctx.nick = my_strdup(nick);
+    ctx.channel = my_strdup(channel);
     
     irc_set_ctx (g_irc_s, &ctx);
     irc_option_set(g_irc_s, LIBIRC_OPTION_STRIPNICKS);
