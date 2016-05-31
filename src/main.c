@@ -484,8 +484,6 @@ void gui_handler(Board *b, Game *g, ALLEGRO_EVENT *ev, ALLEGRO_EVENT_QUEUE *queu
 
 
 void create_base_gui(Board *b, Game *g, ALLEGRO_EVENT_QUEUE *queue){
-    init_theme(b);
-
     if(!b->gui){
         b->gui = init_gui(b->x, b->y, b->size*(1.0+PANEL_PORTION + PANEL_SPACE), b->size, b->theme);
         add_gui(NULL, queue, b->gui, 0);
@@ -520,6 +518,7 @@ void create_board(Board *b, Game *g){
     b->board_input = 1;
     b->fsize = b->tsize*0.5;
     b->font = load_font_mem(text_font_mem, TEXT_FONT_FILE, -b->fsize);
+    init_theme(b);
 }
 
 void destroy_board(Board *b){
