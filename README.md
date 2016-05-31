@@ -35,3 +35,12 @@ If Allegro or Ircclient are not found, you can add -DVAR=path when calling cmake
 	Alleg_ROOT: path to a dir containing include/allegro5 and lib/liballeg*
 	IRC_CLIENT_INCLUDE_DIR: path to a dir contianing the libircclient headers.
 	IRC_CLIENT_LIBRARY: path to the ircclient library (probably libircclient.so)
+
+To build on windows (with cmake and visual studio) from the visual studio developer command prompt do the following, making sure to replace [VARS] by declarations of the form -DVAR=path as explained above pointing to the libraries:
+	cd gess-client
+	mkdir build
+	cmake -G "NMake Makefiles" -DCMAKE_BUILD_TYPE=Release [VARS] ..
+	nmake
+	
+To run the executable, you must copy the dlls of all the required libraries (ircclient and allegro) to gess-client/build.
+

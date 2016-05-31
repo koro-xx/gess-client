@@ -143,7 +143,7 @@ void term_draw(Terminal *t, float x, float y, float w, float h, ALLEGRO_FONT *fo
     int ch = al_get_font_line_height(font);
     int cw = al_get_glyph_advance(font, '0', '0');
     int tw = w/cw, th = h/ch;
-    char temp[tw+1];
+    char *temp = malloc(tw+1);
     char *str = term_print_str(t, tw, th);
 
     al_draw_filled_rectangle(x,y, x + w, y + h, bg_color);
@@ -158,4 +158,7 @@ void term_draw(Terminal *t, float x, float y, float w, float h, ALLEGRO_FONT *fo
         shift = (t->cursor-1)/tw;
         al_draw_text(font, fg_color, x, y+(ch-1)*ch, ALLEGRO_ALIGN_LEFT, t->buf+shift*tw);
     }
+	
+	free(temp);
+	free(str);
 }

@@ -150,7 +150,7 @@ void *create_irc_thread(ALLEGRO_THREAD *thr, void *arg){
     return NULL;
 }
 
-
+/*
 #ifdef _WIN32
 int winsock_init(void){
     static int ws_init=0;
@@ -167,16 +167,18 @@ int winsock_init(void){
     return 0;
 }
 #endif
+*/
 
 int IRC_connect(const char *server, int port, const char *nick, const char *channel)
 {
     ALLEGRO_THREAD *irc_thread;
     irc_callbacks_t	callbacks;
 
+	/*
 #ifdef _WIN32 // need to initialize exactly once per app.
     if (winsock_init()) return 1;
 #endif
-    
+    */
         
     memset (&callbacks, 0, sizeof(callbacks));
     
