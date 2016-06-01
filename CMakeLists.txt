@@ -75,8 +75,10 @@ target_link_libraries(gess ${LINK_LIBRARIES})
 
 if(APPLE)
     set_source_files_properties(${RESOURCES} PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
-elseif(WIN32)
-    set_target_properties(gess PROPERTIES COMPILE_DEFINITIONS "_CRT_SECURE_NO_WARNINGS;WIN32_LEAN_AND_MEAN;WIN32")
-elseif(UNIX)
+else(APPLE)
     file(COPY ${RESOURCES} DESTINATION .)
 endif(APPLE)
+
+if(WIN32)
+    set_target_properties(gess PROPERTIES COMPILE_DEFINITIONS "_CRT_SECURE_NO_WARNINGS;WIN32_LEAN_AND_MEAN;WIN32")
+endif(WIN32)
