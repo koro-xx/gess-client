@@ -46,12 +46,14 @@ void addlog (const char * fmt, ...)
     va_end (va_alist);
     
     deblog("%s", buf);
-    
+   
+#if 0
     if ( (fp = fopen ("irctest.log", "ab")) != 0 )
     {
         fprintf (fp, "%s\n", buf);
         fclose (fp);
     }
+#endif
 }
 
 
