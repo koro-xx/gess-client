@@ -5,7 +5,7 @@
 #include "terminal.h"
 #include "widgetz/widgetz.h"
 
-#define DEFAULT_FONT_FILE "fonts/fixed_font.tga"
+//#define DEFAULT_FONT_FILE "fonts/fixed_font.tga"
 
 #define BASE_USER_EVENT_TYPE ALLEGRO_GET_EVENT_TYPE('c','c','c','c')
 #define EVENT_REDRAW (BASE_USER_EVENT_TYPE + 1)

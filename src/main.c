@@ -55,13 +55,6 @@ float fixed_dt = 1.0/FPS;
 int desktop_xsize, desktop_ysize;
 int fullscreen;
 
-// move elsewhere
-char *strdup (const char *s) {
-    char *d = malloc (strlen (s) + 1);   // Allocate memory
-    if (d != NULL) strcpy (d,s);         // Copy string if okay
-    return d;                            // Return new memory
-}
-
 void chat_term_add_line(Terminal *t, const char *origin, const char *msg){
     char str[512];
     snprintf(str, 512, "<%s> %s", origin, msg);
@@ -702,6 +695,21 @@ void enter_move(Game *g, Board *b){
     }
 }
 
+void halt(ALLEGRO_EVENT_QUEUE *queue){
+    ALLEGRO_DISPLAY *disp =al_get_current_display();
+    al_acknowledge_drawing_halt(disp);
+    deblog("ACKNOWLEDGED HALT");
+    ALLEGRO_EVENT ev;
+ //   al_set_default_voice(NULL); // otherwise it keeps streaming when the app is on background
+    do{
+        al_wait_for_event(queue, &ev);
+    }while(ev.type != ALLEGRO_EVENT_DISPLAY_RESUME_DRAWING);
+//    al_restore_default_mixer();
+    al_acknowledge_drawing_resume(disp);
+    deblog("ACKNOWLEDGED RESUME");
+    al_rest(0.01);
+    al_flush_event_queue(queue);
+}
 
 
 // create a match struct. pass it as event on restart
@@ -1044,6 +1052,7 @@ RESTART:
             if(ev.type == ALLEGRO_EVENT_DISPLAY_HALT_DRAWING){
                 // first thing to process
                 deblog("RECEIVED HALT");
+                halt(event_queue);
                 break;
             }
             

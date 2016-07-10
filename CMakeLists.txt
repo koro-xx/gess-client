@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.0)
 
-project(gess VERSION 0.3 LANGUAGES CXX C)
+project(gess VERSION 0.3.1 LANGUAGES CXX C)
 
 set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 find_package(Alleg REQUIRED)
@@ -82,3 +82,4 @@ endif(APPLE)
 if(WIN32)
     set_target_properties(gess PROPERTIES COMPILE_DEFINITIONS "_CRT_SECURE_NO_WARNINGS;WIN32_LEAN_AND_MEAN;WIN32")
 endif(WIN32)
+
