@@ -67,6 +67,16 @@ void send_privmsg(Board *b, const char *nick, const char *msg){
     chat_term_add_line(b->chat_term, al_cstr(b->nick), msg);
 }
 
+void send_chanmsg(Board *b, const char *channel, const char *msg){
+    char str[512];
+    
+    if(channel) irc_cmd_msg(g_irc_s, channel, msg);
+    deblog("SENT: %s | %s", channel, msg);
+    snprintf(str, 511, "<%s|%s> %s", channel, al_cstr(b->nick), msg);
+    term_add_line(b->chat_term, str);
+}
+
+
 void acknowledge_privmsg(Board *b, const char *nick, const char *msg){
     char str[128];
     snprintf(str, 127, ":ACK %s", msg);
@@ -363,9 +373,12 @@ void gui_handler(Board *b, Game *g, ALLEGRO_EVENT *ev, ALLEGRO_EVENT_QUEUE *queu
         {
             if(ev->type == WZ_TEXT_CHANGED){
              // xxx todo: check that satus is playing on irc and opponent exists!
-                if(b->connected <= 0 || b->game_state != GAME_PLAYING_IRC)
+                if(b->connected <= 0)
                     break;
-                send_privmsg(b, al_cstr(b->opponent), (char *) al_cstr(((WZ_EDITBOX*)wgt)->text));
+                if(b->game_state == GAME_PLAYING_IRC)
+                    send_privmsg(b, al_cstr(b->opponent), (char *) al_cstr(((WZ_EDITBOX*)wgt)->text));
+                else
+                    send_chanmsg(b, al_cstr(b->channel), (char *) al_cstr(((WZ_EDITBOX*)wgt)->text));
                 wz_set_text(wgt, USTR_NULL);
             } else if(ev->type == WZ_BUTTON_PRESSED){
                 if(ev->user.data1 == BUTTON_CANCEL){
@@ -723,13 +736,21 @@ void halt(ALLEGRO_EVENT_QUEUE *queue){
 void process_irc_event(Game *g, Board *b, int type, ALLEGRO_USER_EVENT *ev, ALLEGRO_EVENT_QUEUE *queue)
 {
     char *origin, *msg; // we should free these
+    char chat_print[512];
     int undo;
     
     origin = (char*) ev->data1;
     msg = (char *) ev->data2;
 
     deblog("RECEIVED: %s | %s", origin, msg);
-    chat_term_add_line(b->chat_term, origin, msg);
+    if(type == EVENT_PRIVMSG_RECEIVED)
+        snprintf(chat_print, 511, "<%s> %s", origin, msg);
+    else if (type == EVENT_CHANMSG_RECEIVED)
+        snprintf(chat_print, 511, "<%s|%s> %s", al_cstr(b->channel), origin, msg);
+    else
+        snprintf(chat_print, 511, "%s | %s", origin, msg);
+    
+    term_add_line(b->chat_term, chat_print);
     
     switch(type)
     {
