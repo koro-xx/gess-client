@@ -55,6 +55,11 @@ float fixed_dt = 1.0/FPS;
 int desktop_xsize, desktop_ysize;
 int fullscreen;
 
+void update_irc_nick(char *new_nick)
+{
+    irc_cmd_nick(g_irc_s, new_nick);
+}
+
 void chat_term_add_line(Terminal *t, const char *origin, const char *msg){
     char str[512];
     snprintf(str, 512, "<%s> %s", origin, msg);
@@ -75,7 +80,6 @@ void send_chanmsg(Board *b, const char *channel, const char *msg){
     snprintf(str, 511, "<%s|%s> %s", channel, al_cstr(b->nick), msg);
     term_add_line(b->chat_term, str);
 }
-
 
 void acknowledge_privmsg(Board *b, const char *nick, const char *msg){
     char str[128];
@@ -153,7 +157,7 @@ void init_board(Board *b){
     b->connected = 0;
     b->allow_move = 1;
     b->chat_term = term_create();
-    b->opponent = al_ustr_new("");
+    b->opponent = NULL;
     b->irc_status_msg = al_ustr_new("Connect");
     b->request_player = 0;
     b->new_opponent = NULL;
@@ -310,7 +314,7 @@ void gui_handler(Board *b, Game *g, ALLEGRO_EVENT *ev, ALLEGRO_EVENT_QUEUE *queu
 
             case BUTTON_RESET:
                 if(b->game_state == GAME_PLAYING_IRC)
-                    add_gui(b->gui, queue, create_msg_gui(b, -1, al_ustr_new("Cannot do that while playing online")),1);
+                    add_gui(b->gui, queue, create_msg_gui(b, GUI_MESSAGE, al_ustr_new("Cannot do that while playing online")),1);
                 else
                     emit_event(EVENT_RESTART);
                 break;
@@ -488,6 +492,13 @@ void gui_handler(Board *b, Game *g, ALLEGRO_EVENT *ev, ALLEGRO_EVENT_QUEUE *queu
     }
 }
 
+
+void game_over(Game *g, Board *b)
+{
+    b->allow_move = 0;
+    b->game_state = GAME_OVER;
+    emit_event(EVENT_GAME_OVER);
+}
 
 void create_base_gui(Board *b, Game *g, ALLEGRO_EVENT_QUEUE *queue){
     if(!b->gui){
@@ -680,6 +691,12 @@ int try_move(Game *g, Board *b, int i, int j){
         b->draw_last = 1; //xxx todo: if set->draw_last
         ret = 1;
         swap_turn(g,b);
+        // check for win condition
+        if ( !(has_ring(g->brd) & g->turn ) )
+        {
+            swap_turn(g,b);
+            game_over(g,b);
+        }
     } // else no move was made
     
     drop_block(g->brd, i, j, &b->lock_blk);
@@ -732,6 +749,27 @@ void halt(ALLEGRO_EVENT_QUEUE *queue){
 //    int type;
 //} Match;
 
+void update_displayed_names(Board *b)
+{
+    if(!b->opponent)
+    {
+        al_ustr_assign_cstr(b->player1_name, "Player 1");
+        al_ustr_assign_cstr(b->player2_name, "Player 2");
+    }
+    else
+    {
+        if(b->player == 1)
+        {
+            al_ustr_assign(b->player1_name, b->nick);
+            al_ustr_assign(b->player2_name, b->opponent);
+        }
+        else
+        {
+            al_ustr_assign(b->player1_name, b->opponent);
+            al_ustr_assign(b->player2_name, b->nick);
+        }
+    }
+}
 
 void process_irc_event(Game *g, Board *b, int type, ALLEGRO_USER_EVENT *ev, ALLEGRO_EVENT_QUEUE *queue)
 {
@@ -754,6 +792,33 @@ void process_irc_event(Game *g, Board *b, int type, ALLEGRO_USER_EVENT *ev, ALLE
     
     switch(type)
     {
+        case EVENT_IRC_NICK:
+        {
+            if(!strcmp(origin, al_cstr(b->nick)))
+            {
+                // player nick has changed
+                al_ustr_assign_cstr(b->nick, msg);
+                update_displayed_names(b);
+            }
+            else
+            {
+                if(b->opponent && !strcmp(al_cstr(b->opponent), origin))
+                {
+                    // opponent nick has changed
+                    al_ustr_assign_cstr(b->opponent, msg);
+                    update_displayed_names(b);
+                }
+            }
+            break;
+        }
+        case EVENT_IRC_QUIT:
+            if( (b->game_state == GAME_PLAYING_IRC) && b->opponent && !strcmp(origin, al_cstr(b->opponent)) )
+            {
+                add_gui(b->gui, queue, create_msg_gui(b, GUI_MESSAGE, al_ustr_new("Your opponent has disconnected.")), 1);
+                b->allow_move = 0;
+                b->game_state = GAME_OVER;
+                break;
+            }
         case EVENT_PRIVMSG_RECEIVED:
         {
             if(msg[0] != ':')
@@ -903,8 +968,8 @@ void process_irc_event(Game *g, Board *b, int type, ALLEGRO_USER_EVENT *ev, ALLE
 }
 
 void init_irc_game(Board *b, Game *g){
-    al_ustr_assign(b->opponent, b->new_opponent);
-    al_ustr_free(b->new_opponent);
+    if(b->opponent) al_ustr_free(b->opponent);
+    b->opponent = b->new_opponent;
     b->new_opponent = NULL;
     b->player = b->new_player;
 
@@ -1126,8 +1191,14 @@ RESTART:
                     redraw=1;
                     break;
                     
+                case EVENT_GAME_OVER:
+                    add_gui(b.gui, event_queue, create_msg_gui(&b, GUI_MESSAGE, al_ustr_newf("Player %d wins.", g.turn)), 1);
+                    break;
+                    
                 case EVENT_PRIVMSG_RECEIVED:
                 case EVENT_CHANMSG_RECEIVED:
+                case EVENT_IRC_QUIT:
+                case EVENT_IRC_NICK:
                     process_irc_event(&g, &b, ev.type, &ev.user, event_queue);
                     redraw=1;
                     break;

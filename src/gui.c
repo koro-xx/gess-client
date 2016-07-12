@@ -213,7 +213,8 @@ void apply_settings_gui(Board *b, WZ_WIDGET *gui){
                 al_ustr_assign(b->channel, ((WZ_TEXTBOX*)wgt)->text);
                 break;
             case EDITBOX_NICK:
-                al_ustr_assign(b->nick, ((WZ_TEXTBOX*)wgt)->text);
+                if(b->connected) update_irc_nick(al_cstr(((WZ_TEXTBOX*)wgt)->text));
+                else al_ustr_assign(b->nick, ((WZ_TEXTBOX*)wgt)->text);
                 break;
             case BUTTON_COLOR:
                 if(al_ustr_has_prefix_cstr(((WZ_BUTTON*)wgt)->text, "White"))

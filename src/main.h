@@ -24,5 +24,6 @@ irc_session_t *g_irc_s;
 void emit_event(int event_type);
 void emit_data_event(int event, intptr_t d1, intptr_t d2, intptr_t d3, intptr_t d4);
 int IRC_connect(const char *server, int port, const char *nick, const char *channel);
+void update_irc_nick(char *new_nick);
 
 #endif

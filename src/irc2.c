@@ -86,6 +86,22 @@ void event_join (irc_session_t * session, const char * event, const char * origi
 }
 
 
+void event_nick (irc_session_t * session, const char * event, const char * origin, const char ** params, unsigned int count)
+{
+    dump_event (session, event, origin, params, count);
+    emit_data_event(EVENT_IRC_NICK, (intptr_t) my_strdup(origin), my_strdup(params[0]), 0, 0);
+    
+    //xxx todo: change ctx nick!!!
+}
+
+void event_quit (irc_session_t * session, const char * event, const char * origin, const char ** params, unsigned int count)
+{
+    dump_event (session, event, origin, params, count);
+    emit_data_event(EVENT_IRC_QUIT, (intptr_t) my_strdup(origin), 0, 0, 0);
+    //xxx todo: change ctx nick!!!
+}
+
+
 void event_connect (irc_session_t * session, const char * event, const char * origin, const char ** params, unsigned int count)
 {
     irc_ctx_t * ctx = (irc_ctx_t *) irc_get_ctx (session);
@@ -186,8 +202,8 @@ int IRC_connect(const char *server, int port, const char *nick, const char *chan
     
     callbacks.event_connect = event_connect;
     callbacks.event_join = event_join;
-    callbacks.event_nick = dump_event;
-    callbacks.event_quit = dump_event;
+    callbacks.event_nick = event_nick;
+    callbacks.event_quit = event_quit;
     callbacks.event_part = dump_event;
     callbacks.event_mode = dump_event;
     callbacks.event_topic = dump_event;
